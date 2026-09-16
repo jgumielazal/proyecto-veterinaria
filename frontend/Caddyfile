@@ -1,0 +1,17 @@
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT} {
+	handle_path /api/* {
+		# Preserve request headers and upstream responses, including cookies.
+		reverse_proxy {$BACKEND_URL}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
