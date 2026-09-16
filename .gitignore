@@ -1,0 +1,54 @@
+# Dependencias
+node_modules/
+
+# Entornos locales (conservar plantillas sin secretos)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.local
+
+# Credenciales y claves privadas
+secrets/
+.secrets/
+credentials.json
+credentials.*.json
+*.pem
+*.key
+*.p12
+*.pfx
+.npmrc
+
+# Builds y cachés
+dist/
+build/
+coverage/
+.vite/
+.cache/
+*.tsbuildinfo
+
+# Logs y archivos temporales
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
+
+# Datos y respaldos locales de bases de datos
+postgres_data/
+pgdata/
+backups/
+*.dump
+*.backup
+
+# Sistema operativo y editores
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
