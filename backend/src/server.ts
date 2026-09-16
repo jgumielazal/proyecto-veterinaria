@@ -6,11 +6,15 @@ import configurarAuth = require("./auth");
 const app = express();
 app.use(express.json());
 const pool = new pg.Pool({
-  host: "127.0.0.1",
-  port: 5432,
-  user: "veterinaria",
-  password: "veterinaria_local",
-  database: "veterinaria",
+  ...(process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL }
+    : {
+        host: "127.0.0.1",
+        port: 5432,
+        user: "veterinaria",
+        password: "veterinaria_local",
+        database: "veterinaria",
+      }),
   connectionTimeoutMillis: 3000,
   query_timeout: 3000,
 });
@@ -128,6 +132,7 @@ app.delete("/mascotas/:id", async (req, res) => {
   }
 });
 
-app.listen(3001, () => {
-  console.log("Servidor escuchando en http://localhost:3001");
+const port = Number(process.env.PORT ?? 3001);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Servidor escuchando en http://0.0.0.0:${port}`);
 });
