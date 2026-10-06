@@ -1,5 +1,5 @@
 import express = require("express");
-import pg = require("pg");
+import pool = require("./db/pool");
 
 import configurarAuth = require("./auth");
 import crearMascotasDao = require("./dao/mascotas.dao");
@@ -8,24 +8,6 @@ import crearMascotasRouter = require("./routes/mascotas.routes");
 
 const app = express();
 app.use(express.json());
-const pool = new pg.Pool({
-  ...(process.env.DATABASE_URL
-    ? { connectionString: process.env.DATABASE_URL }
-    : {
-        host: "127.0.0.1",
-        port: 5432,
-        user: "veterinaria",
-        password: "veterinaria_local",
-        database: "veterinaria",
-      }),
-  connectionTimeoutMillis: 3000,
-  query_timeout: 3000,
-});
-
-pool.on("error", (error) => {
-  console.error("Error de conexión con PostgreSQL:", error.message);
-});
-
 app.get("/health", async (_req, res) => {
   try {
     await pool.query("SELECT 1");
