@@ -23,14 +23,33 @@ async function req(path, method='GET', body, cookie='') {
   assert.equal((await req('/auth/login','POST',{email:emails[0],password:'incorrecta'})).status,401);
   assert.equal((await req('/auth/me','GET',undefined,cookies[0])).status,200);
   assert.deepEqual(await (await req('/mascotas','GET',undefined,cookies[0])).json(),[]);
-  let r=await req('/mascotas','POST',{nombre:'Propia',especie:'gato',edad:0,usuario_id:ids[1]},cookies[0]);
+  const errorDatos = {error:'Nombre y especie son obligatorios. Edad debe ser un número entero entre 0 y 2147483647.'};
+  for (const datos of [{}, {nombre:' ',especie:'gato',edad:1}, {nombre:'Prueba',especie:' ',edad:1},
+    ...[-1, 1.5, 2147483648, '2', null].map(edad => ({nombre:'Prueba',especie:'gato',edad}))]) {
+    const respuesta = await req('/mascotas','POST',datos,cookies[0]);
+    assert.equal(respuesta.status,400); assert.deepEqual(await respuesta.json(),errorDatos);
+  }
+  for (const id of ['0','-1','1.5','abc','2147483648']) {
+    for (const method of ['PUT','DELETE']) {
+      const respuesta = await req('/mascotas/'+id,method,{},cookies[0]);
+      assert.equal(respuesta.status,400);
+      assert.deepEqual(await respuesta.json(),{error:'El id debe ser un entero positivo válido'});
+    }
+  }
+  let r=await req('/mascotas','POST',{nombre:' Propia ',especie:' gato ',edad:0,usuario_id:ids[1]},cookies[0]);
   assert.equal(r.status,201); const mascota=await r.json();
+  assert.deepEqual(mascota,{id:mascota.id,nombre:'Propia',especie:'gato',edad:0});
   assert.deepEqual(await (await req('/mascotas','GET',undefined,cookies[1])).json(),[]);
   for (const method of ['PUT','DELETE']) assert.equal((await req('/mascotas/'+mascota.id,method,{nombre:'Ajena',especie:'perro',edad:2},cookies[1])).status,404);
   assert.equal((await req('/mascotas/'+mascota.id,'PUT',{nombre:'',especie:'gato',edad:-1},cookies[0])).status,400);
   r=await req('/mascotas/'+mascota.id,'PUT',{nombre:'Editada',especie:'gato',edad:2},cookies[0]); assert.equal(r.status,200); assert.equal((await r.json()).nombre,'Editada');
   assert.equal((await req('/mascotas/'+mascota.id,'DELETE',undefined,cookies[0])).status,204);
   assert.deepEqual(await (await req('/mascotas','GET',undefined,cookies[0])).json(),[]);
+  for (const method of ['PUT','DELETE']) {
+    const respuesta = await req('/mascotas/'+mascota.id,method,{nombre:'Inactiva',especie:'gato',edad:1},cookies[0]);
+    assert.equal(respuesta.status,404);
+    assert.deepEqual(await respuesta.json(),{error:'Mascota no encontrada'});
+  }
   const db=await pool.query('SELECT activa, usuario_id FROM mascotas WHERE id=$1',[mascota.id]); assert.deepEqual(db.rows[0],{activa:false,usuario_id:ids[0]});
   assert.equal((await req('/auth/logout','POST',undefined,cookies[0])).status,204);
   assert.equal((await req('/auth/me','GET',undefined,cookies[0])).status,401);
