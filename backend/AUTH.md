@@ -7,6 +7,7 @@ docker compose up -d
 docker compose exec -T postgres psql -U veterinaria -d veterinaria -v ON_ERROR_STOP=1 < backend/migrations/001_crear_mascotas.sql
 docker compose exec -T postgres psql -U veterinaria -d veterinaria -v ON_ERROR_STOP=1 < backend/migrations/002_baja_logica_mascotas.sql
 docker compose exec -T postgres psql -U veterinaria -d veterinaria -v ON_ERROR_STOP=1 < backend/migrations/003_usuarios_sesiones.sql
+docker compose exec -T postgres psql -U veterinaria -d veterinaria -v ON_ERROR_STOP=1 < backend/migrations/004_tipos_usuario.sql
 ```
 
 Arrancar backend con `cd backend && npm start` y frontend en otra terminal con `cd frontend && npm run dev`. Abrir http://localhost:5173. No hacen falta secretos ni dependencias nuevas para uso local.
@@ -22,3 +23,19 @@ Arrancar backend con `cd backend && npm start` y frontend en otra terminal con `
 Con los tres servicios activos, ejecutar desde la raíz `node backend/tests/auth.cjs`. La prueba usa dos cuentas temporales, comprueba aislamiento y limpia únicamente sus propios datos. No automatiza la interfaz visual.
 
 Esto está configurado para desarrollo local. Para publicarlo se necesita HTTPS, `NODE_ENV=production` (activa la cookie Secure), y un proxy que sirva `/api` hacia el backend; el proxy de Vite es de desarrollo.
+
+## Tipos de usuario
+
+La migración `004_tipos_usuario.sql` agrega `usuarios.tipo`, obligatorio y limitado a
+`cliente` (dueño de la mascota), `veterinario` o `admin`. Las cuentas existentes
+y los registros públicos nuevos quedan como `cliente` (dueño). El registro público
+asigna ese tipo explícitamente en el servidor, ignorando cualquier `tipo`, `rol`
+o `role` enviado en la solicitud. La pantalla informa que la cuenta es para dueños
+y no ofrece selección de roles. El DAO permite indicar
+un tipo al crear cuentas desde código interno; el registro público sigue recibiendo
+solo email y contraseña y no permite elegir el tipo. Para reclasificar una cuenta
+existente se actualiza `usuarios.tipo` directamente en la base de datos.
+
+Esta clasificación no modifica permisos: todos los tipos conservan acceso solo
+a sus propias mascotas. Las pantallas y las respuestas de autenticación
+(`id`, `email`) se mantienen sin cambios.

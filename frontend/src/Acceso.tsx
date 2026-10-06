@@ -45,7 +45,7 @@ export default function Acceso() {
   }
   if (iniciando) return <main><p role="status">Verificando sesión…</p></main>;
   if (usuario) return <><div className="session-bar"><span>{usuario.email}</span><button disabled={ocupado} onClick={() => void salir()}>Cerrar sesión</button>{error && <p role="alert">{error}</p>}</div><Mascotas key={usuario.id} /></>;
-  return <main className="login"><header><p>Veterinaria</p><h1>{registro ? 'Crear cuenta' : 'Iniciar sesión'}</h1><p>Ingresá para administrar tus mascotas.</p></header>
+  return <main className="login"><header><p>Veterinaria</p><h1>{registro ? 'Crear cuenta de dueño' : 'Iniciar sesión'}</h1><p>{registro ? 'El registro es exclusivo para dueños de mascotas. Tu cuenta se crea automáticamente con ese rol.' : 'Ingresá para administrar tus mascotas.'}</p></header>
     {error && <p className="error" role="alert">{error}</p>}
     <section><form onSubmit={enviar}><fieldset disabled={ocupado}>
       <label>Email<input type="email" autoComplete="email" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} /></label>

@@ -1,12 +1,14 @@
 import pg = require("pg");
 
+type TipoUsuario = "cliente" | "veterinario" | "admin";
+
 type Usuario = { id: number; email: string };
 type Credenciales = Usuario & { password_hash: string };
 
 export = function crearAuthDao(pool: pg.Pool) {
   return {
-    async crearUsuario(email: string, hash: string) {
-      const result = await pool.query<Usuario>("INSERT INTO usuarios (email, password_hash) VALUES ($1, $2) RETURNING id, email", [email, hash]);
+    async crearUsuario(email: string, hash: string, tipo: TipoUsuario = "cliente") {
+      const result = await pool.query<Usuario>("INSERT INTO usuarios (email, password_hash, tipo) VALUES ($1, $2, $3) RETURNING id, email", [email, hash, tipo]);
       return result.rows[0]!;
     },
     async buscarUsuario(email: string) {

@@ -41,7 +41,8 @@ function crearAuthNegocio(dao: ReturnType<typeof crearAuthDao>) {
         if (accion === "registro") {
           const salt = crypto.randomBytes(16).toString("hex");
           const hash = `${salt}:${(await derivar(password, salt)).toString("hex")}`;
-          usuario = await dao.crearUsuario(normalizado, hash);
+          // El registro público siempre crea dueños; nunca toma el rol de la solicitud.
+          usuario = await dao.crearUsuario(normalizado, hash, "cliente");
         } else {
           const row = await dao.buscarUsuario(normalizado);
           const [salt, esperado] = (row?.password_hash ?? `${"0".repeat(32)}:${"0".repeat(128)}`).split(":");
