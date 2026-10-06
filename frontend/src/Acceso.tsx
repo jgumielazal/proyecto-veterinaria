@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import Mascotas from './App';
+import Administracion from './Administracion';
 
-type Usuario = { id: number; email: string };
+type Usuario = { id: number; email: string; tipo: 'cliente' | 'veterinario' | 'admin' };
 export default function Acceso() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [iniciando, setIniciando] = useState(true);
@@ -44,7 +45,7 @@ export default function Acceso() {
     finally { setOcupado(false); }
   }
   if (iniciando) return <main><p role="status">Verificando sesión…</p></main>;
-  if (usuario) return <><div className="session-bar"><span>{usuario.email}</span><button disabled={ocupado} onClick={() => void salir()}>Cerrar sesión</button>{error && <p role="alert">{error}</p>}</div><Mascotas key={usuario.id} /></>;
+  if (usuario) return <><div className="session-bar"><span>{usuario.email}</span><button disabled={ocupado} onClick={() => void salir()}>Cerrar sesión</button>{error && <p role="alert">{error}</p>}</div>{usuario.tipo === 'admin' ? <Administracion key={usuario.id} /> : <Mascotas key={usuario.id} />}</>;
   return <main className="login"><header><p>Veterinaria</p><h1>{registro ? 'Crear cuenta de dueño' : 'Iniciar sesión'}</h1><p>{registro ? 'El registro es exclusivo para dueños de mascotas. Tu cuenta se crea automáticamente con ese rol.' : 'Ingresá para administrar tus mascotas.'}</p></header>
     {error && <p className="error" role="alert">{error}</p>}
     <section><form onSubmit={enviar}><fieldset disabled={ocupado}>

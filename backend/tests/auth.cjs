@@ -30,7 +30,7 @@ async function req(path, method='GET', body, cookie='') {
     assert.match(r.headers.get('set-cookie'),/SameSite=Strict/i);
     assert.match(r.headers.get('set-cookie'),/Max-Age=604800/i);
     const usuario = await r.json();
-    assert.deepEqual(Object.keys(usuario).sort(),['email','id']);
+    assert.deepEqual(Object.keys(usuario).sort(),['email','id','tipo']);
     assert.equal(usuario.email,email);
     ids.push(usuario.id); cookies.push(r.headers.get('set-cookie').split(';')[0]);
     const token = cookies.at(-1).slice('sesion='.length);
@@ -86,15 +86,12 @@ async function req(path, method='GET', body, cookie='') {
   assert.deepEqual(await vencida.json(),{error:'La sesión venció. Iniciá sesión nuevamente.'});
   assert.equal((await req('/auth/me','GET',undefined,cookies[1])).status,200);
   assert.equal((await fetch(origin+'/auth/logout',{method:'POST',headers:{Cookie:cookies[1]}})).status,403);
-  // Registro y login comparten el límite; una sesión vigente sigue funcionando.
-  let limitada;
-  for (let i=0; i<21; i++) {
-    limitada = await req(i % 2 ? '/auth/login' : '/auth/registro','POST',{});
-    if (limitada.status === 429) break;
-    assert.equal(limitada.status,400);
+  // Los intentos inválidos no bloquean el login posterior.
+  for (let i=0; i<25; i++) {
+    assert.equal((await req(i % 2 ? '/auth/login' : '/auth/registro','POST',{})).status,400);
   }
-  assert.equal(limitada.status,429);
-  assert.deepEqual(await limitada.json(),{error:'Demasiados intentos. Esperá 15 minutos antes de volver a intentar.'});
+  const sinBloqueo = await req('/auth/login','POST',{email:emails[1],password});
+  assert.equal(sinBloqueo.status,200);
   assert.equal((await req('/auth/me','GET',undefined,cookies[1])).status,200);
   assert.equal((await req('/auth/logout','POST',undefined,cookies[1])).status,204);
   console.log('OK: registro, login, validaciones, cookies, CRUD propio, aislamiento entre usuarios, logout, expiración y protección CSRF.');

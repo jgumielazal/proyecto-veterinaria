@@ -25,11 +25,11 @@ const db = new Client(process.env.DATABASE_URL
     const email = tipo + '@example.test';
     const registro = await negocio.acceder('registro', { email, password, tipo, rol: tipo, role: tipo });
     const usuario = registro.usuario;
-    assert.deepEqual(Object.keys(usuario).sort(), ['email', 'id']);
+    assert.deepEqual(Object.keys(usuario).sort(), ['email', 'id', 'tipo']);
     assert.equal((await db.query('SELECT tipo FROM usuarios WHERE id=$1', [usuario.id])).rows[0].tipo, 'cliente');
     await db.query('UPDATE usuarios SET tipo=$1 WHERE id=$2', [tipo, usuario.id]);
-    assert.deepEqual((await negocio.acceder('login', { email, password })).usuario, usuario);
-    assert.deepEqual(await negocio.autenticar(registro.token), usuario);
+    assert.deepEqual((await negocio.acceder('login', { email, password })).usuario, { ...usuario, tipo });
+    assert.deepEqual(await negocio.autenticar(registro.token), { ...usuario, tipo });
     const interno = await dao.crearUsuario('interno-' + email, 'hash', tipo);
     assert.equal((await db.query('SELECT tipo FROM usuarios WHERE id=$1', [interno.id])).rows[0].tipo, tipo);
   }

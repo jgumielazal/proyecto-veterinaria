@@ -2,17 +2,21 @@ import pg = require("pg");
 
 type TipoUsuario = "cliente" | "veterinario" | "admin";
 
-type Usuario = { id: number; email: string };
+type Usuario = { id: number; email: string; tipo: TipoUsuario };
 type Credenciales = Usuario & { password_hash: string };
 
 export = function crearAuthDao(pool: pg.Pool) {
   return {
     async crearUsuario(email: string, hash: string, tipo: TipoUsuario = "cliente") {
-      const result = await pool.query<Usuario>("INSERT INTO usuarios (email, password_hash, tipo) VALUES ($1, $2, $3) RETURNING id, email", [email, hash, tipo]);
+      const result = await pool.query<Usuario>("INSERT INTO usuarios (email, password_hash, tipo) VALUES ($1, $2, $3) RETURNING id, email, tipo", [email, hash, tipo]);
+      return result.rows[0]!;
+    },
+    async crearVeterinario(nombre: string, email: string, hash: string, matricula: string, especialidad: string) {
+      const result = await pool.query<Usuario>("INSERT INTO usuarios (nombre, email, password_hash, matricula, especialidad, tipo) VALUES ($1, $2, $3, $4, $5, 'veterinario') RETURNING id, email, tipo", [nombre, email, hash, matricula, especialidad]);
       return result.rows[0]!;
     },
     async buscarUsuario(email: string) {
-      const result = await pool.query<Credenciales>("SELECT id, email, password_hash FROM usuarios WHERE email = $1", [email]);
+      const result = await pool.query<Credenciales>("SELECT id, email, tipo, password_hash FROM usuarios WHERE email = $1", [email]);
       return result.rows[0];
     },
     async crearSesion(tokenHash: string, usuarioId: number) {
@@ -22,7 +26,7 @@ export = function crearAuthDao(pool: pg.Pool) {
       await pool.query("DELETE FROM sesiones WHERE token_hash = $1", [tokenHash]);
     },
     async buscarSesion(tokenHash: string) {
-      const result = await pool.query<Usuario>("SELECT u.id, u.email FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id WHERE s.token_hash = $1 AND s.expira > NOW()", [tokenHash]);
+      const result = await pool.query<Usuario>("SELECT u.id, u.email, u.tipo FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id WHERE s.token_hash = $1 AND s.expira > NOW()", [tokenHash]);
       return result.rows[0];
     },
   };

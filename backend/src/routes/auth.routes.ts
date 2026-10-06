@@ -14,7 +14,7 @@ export = function configurarAuthRoutes(app: express.Express, negocio: ReturnType
     if (error instanceof authNegocio.ErrorAuth) {
       const estados = {
         datos_invalidos: 400, credenciales_invalidas: 401, email_registrado: 409,
-        sesion_invalida: 401, sesion_vencida: 401, limite_intentos: 429,
+        sesion_invalida: 401, sesion_vencida: 401,
       };
       res.status(estados[error.motivo]).json({ error: error.message });
       return;
@@ -35,7 +35,6 @@ export = function configurarAuthRoutes(app: express.Express, negocio: ReturnType
   for (const accion of ["registro", "login"] as const) {
     app.post(`/auth/${accion}`, async (req, res) => {
       try {
-        negocio.limitarIntentos(req.ip ?? "local");
         const sesion = await negocio.acceder(accion, req.body);
         res.cookie("sesion", sesion.token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
         res.status(accion === "registro" ? 201 : 200).json(sesion.usuario);
@@ -65,5 +64,19 @@ export = function configurarAuthRoutes(app: express.Express, negocio: ReturnType
     }
   };
   app.get("/auth/me", autenticar, (_req, res) => { res.json(res.locals.usuario); });
+  app.use("/admin", autenticar, (_req, res, next) => {
+    if (res.locals.usuario.tipo !== "admin") {
+      res.status(403).json({ error: "Solo los administradores pueden acceder a esta función" });
+      return;
+    }
+    next();
+  });
+  app.post("/admin/veterinarios", async (req, res) => {
+    try {
+      res.status(201).json(await negocio.crearVeterinario(req.body));
+    } catch (error) {
+      responderError(res, error, "No se pudo crear el veterinario", "Error al crear veterinario:");
+    }
+  });
   app.use("/mascotas", autenticar);
 };

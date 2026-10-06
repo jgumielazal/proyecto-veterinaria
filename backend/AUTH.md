@@ -16,7 +16,7 @@ Arrancar backend con `cd backend && npm start` y frontend en otra terminal con `
 - GET `/auth/me`: usuario actual.
 - POST `/auth/logout`: revoca la sesión.
 - Las escrituras requieren el encabezado `X-Requested-With: veterinaria`; el frontend lo envía automáticamente. Desde el frontend las rutas llevan `/api` por el proxy de Vite.
-- Cookies HttpOnly y SameSite=Strict; sesiones en PostgreSQL que vencen a los 7 días. Contraseñas con scrypt y sal aleatoria. Se limita registro/login a 20 intentos por IP en 15 minutos (contador en memoria). En el proxy local las solicitudes comparten IP.
+- Cookies HttpOnly y SameSite=Strict; sesiones en PostgreSQL que vencen a los 7 días. Contraseñas con scrypt y sal aleatoria. Registro y login no tienen límite de intentos ni período de espera.
 - Todas las operaciones de mascotas requieren sesión. El dueño lo determina el backend, nunca el cuerpo enviado por el cliente.
 - Las mascotas anteriores se conservan sin dueño y no son accesibles por las cuentas nuevas. No se asignan automáticamente.
 
@@ -37,5 +37,26 @@ solo email y contraseña y no permite elegir el tipo. Para reclasificar una cuen
 existente se actualiza `usuarios.tipo` directamente en la base de datos.
 
 Esta clasificación no modifica permisos: todos los tipos conservan acceso solo
-a sus propias mascotas. Las pantallas y las respuestas de autenticación
-(`id`, `email`) se mantienen sin cambios.
+a sus propias mascotas. Las respuestas de autenticación incluyen `id`, `email` y `tipo`.
+El administrador ve la pantalla de administración al iniciar sesión.
+
+
+## Alta de veterinarios por administradores
+
+La migración `005_datos_veterinarios.sql` agrega nombre y matrícula a los usuarios.
+La migración `006_especialidad_veterinarios.sql` agrega especialidad.
+Aplicar ambas antes de usar esta función. Los campos son opcionales en las cuentas
+anteriores; el alta de veterinarios exige nombre, email, contraseña, matrícula y
+especialidad, sin valores vacíos.
+
+POST `/admin/veterinarios` recibe `{ "nombre": "Ana Pérez", "email": "ana@example.com", "password": "contraseña segura", "matricula": "MP-123", "especialidad": "Clínica general" }`.
+Requiere sesión de administrador y el encabezado de escritura habitual. El servidor
+consulta el rol vigente en la base y fija `veterinario` al crear la cuenta; no inicia
+una sesión a nombre del veterinario ni cambia la sesión del administrador.
+Devuelve 201 al crear, 400 por datos inválidos, 409 por email duplicado,
+401 sin sesión y 403 si el usuario no es administrador.
+La matrícula se guarda como texto (hasta 80 caracteres), sin imponer unicidad
+porque puede depender de la jurisdicción. Las contraseñas se guardan con scrypt.
+
+Prueba de integración: desde backend, `node --require tsx/cjs tests/admin.cjs`.
+Usa un servidor temporal y limpia únicamente las cuentas creadas por la prueba.

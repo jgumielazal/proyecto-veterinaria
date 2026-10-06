@@ -1,0 +1,3 @@
+ALTER TABLE usuarios
+  ADD COLUMN nombre VARCHAR(150),
+  ADD COLUMN matricula VARCHAR(80);
