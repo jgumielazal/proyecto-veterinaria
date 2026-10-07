@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Veterinarios from './Veterinarios';
+import AnadirDueno from './AnadirDueno';
+import ListadoDuenos from './ListadoDuenos';
 import ListadoVeterinarios from './ListadoVeterinarios';
 
 const secciones = [
@@ -11,29 +13,32 @@ type Seccion = typeof secciones[number]['nombre'];
 
 export default function Administracion() {
   const [seccion, setSeccion] = useState<Seccion | null>(null);
-  const [opcionVeterinarios, setOpcionVeterinarios] = useState<'Crear veterinario' | 'Listado de veterinarios' | null>(null);
+  const [opcionVeterinarios, setOpcionVeterinarios] = useState<'Añadir veterinario' | 'Listado de veterinarios' | null>(null);
+  const [opcionDuenos, setOpcionDuenos] = useState<'Añadir dueño' | 'Listado de dueños' | null>(null);
   const titulo = useRef<HTMLHeadingElement>(null);
   const primeraVista = useRef(true);
 
   useEffect(() => {
     if (primeraVista.current) primeraVista.current = false;
     else titulo.current?.focus();
-  }, [seccion, opcionVeterinarios]);
+  }, [seccion, opcionVeterinarios, opcionDuenos]);
 
   return <main>
     {seccion && <div className="actions admin-back"><button className="secondary" onClick={() => {
       if (opcionVeterinarios) setOpcionVeterinarios(null);
+      else if (opcionDuenos) setOpcionDuenos(null);
       else setSeccion(null);
-    }}>← {opcionVeterinarios ? 'Volver a Veterinarios' : 'Volver al menú principal'}</button>
-      {opcionVeterinarios && <button type="button" className="secondary" onClick={() => {
+    }}>← {opcionVeterinarios ? 'Volver a Veterinarios' : opcionDuenos ? 'Volver a Dueños' : 'Volver al menú principal'}</button>
+      {(opcionVeterinarios || opcionDuenos) && <button type="button" className="secondary" onClick={() => {
         setOpcionVeterinarios(null);
+        setOpcionDuenos(null);
         setSeccion(null);
       }}>Ir al menú principal</button>}
     </div>}
     <header>
       <p>Panel de administrador</p>
-      <h1 ref={titulo} tabIndex={-1}>{opcionVeterinarios ?? seccion ?? 'Menú principal'}</h1>
-      <p>{opcionVeterinarios ? 'Veterinarios' : seccion ? secciones.find(item => item.nombre === seccion)?.descripcion : 'Elegí una sección para continuar.'}</p>
+      <h1 ref={titulo} tabIndex={-1}>{opcionVeterinarios ?? opcionDuenos ?? seccion ?? 'Menú principal'}</h1>
+      <p>{opcionVeterinarios ? 'Veterinarios' : opcionDuenos ? 'Dueños' : seccion ? secciones.find(item => item.nombre === seccion)?.descripcion : 'Elegí una sección para continuar.'}</p>
     </header>
     {seccion === null ? <nav className="admin-menu" aria-label="Menú principal del administrador">
       {secciones.map(item => <button key={item.nombre} className="admin-card" onClick={() => setSeccion(item.nombre)}>
@@ -43,8 +48,8 @@ export default function Administracion() {
       </button>)}
     </nav> : seccion === 'Veterinarios' ? (
       opcionVeterinarios === null ? <nav className="admin-menu" aria-label="Opciones de veterinarios">
-        <button className="admin-card" onClick={() => setOpcionVeterinarios('Crear veterinario')}>
-          <span className="admin-card-title">Crear veterinario</span>
+        <button className="admin-card" onClick={() => setOpcionVeterinarios('Añadir veterinario')}>
+          <span className="admin-card-title">Añadir veterinario</span>
           <span className="admin-card-description">Creá una cuenta para un veterinario.</span>
           <span className="admin-card-link">Ingresar →</span>
         </button>
@@ -53,9 +58,17 @@ export default function Administracion() {
           <span className="admin-card-description">Consultá los profesionales registrados y accedé a sus perfiles.</span>
           <span className="admin-card-link">Ingresar →</span>
         </button>
-      </nav> : opcionVeterinarios === 'Crear veterinario' ? <Veterinarios /> : <ListadoVeterinarios />
+      </nav> : opcionVeterinarios === 'Añadir veterinario' ? <Veterinarios /> : <ListadoVeterinarios />
+    ) : seccion === 'Dueños' ? (
+      opcionDuenos === null ? <nav className="admin-menu" aria-label="Opciones de dueños">
+        {(['Añadir dueño', 'Listado de dueños'] as const).map(opcion => <button key={opcion} className="admin-card" onClick={() => setOpcionDuenos(opcion)}>
+          <span className="admin-card-title">{opcion}</span>
+          <span className="admin-card-description">{opcion === 'Añadir dueño' ? 'Registrá una cuenta de dueño.' : 'Consultá los clientes y filtrá por DNI.'}</span>
+          <span className="admin-card-link">Ingresar →</span>
+        </button>)}
+      </nav> : opcionDuenos === 'Añadir dueño' ? <AnadirDueno /> : <ListadoDuenos />
     ) : <section>
-      <h2>{seccion === 'Dueños' ? 'Gestión de dueños' : 'Administración general'}</h2>
+      <h2>Administración general</h2>
       <p>Las funciones de esta sección todavía no están disponibles.</p>
     </section>}
   </main>;

@@ -71,3 +71,21 @@ Requiere aplicar `007_estado_usuarios.sql` mediante el ejecutor de migraciones.
 - DELETE `/admin/veterinarios/:id`: establece `activo = false`, sin eliminar el usuario. Repetir la baja es seguro.
 
 Todas las rutas requieren sesión de administrador; las escrituras requieren el encabezado habitual. Devuelven 404 si no existe un veterinario con ese identificador. Los usuarios inactivos no pueden iniciar sesión y sus sesiones existentes dejan de autenticar. No se exponen hashes de contraseñas.
+
+## DNI de usuarios
+
+La migración `008_dni_usuarios.sql` agrega `dni` como texto obligatorio, único y de exactamente ocho dígitos ASCII. Conserva ceros iniciales. El índice único permite búsquedas por DNI; el listado de dueños incluye un filtro por DNI completo o parcial.
+
+Asigna DNI ficticios `11111111`, `22222222`, etc. por posición en `ORDER BY id`, sin usar el valor del ID como número de orden. Si hay más de nueve usuarios, detiene la migración sin cambios para evitar valores inválidos o repetidos; se debe definir otra secuencia para ese caso.
+
+El registro público y el alta/edición de veterinarios requieren `dni` como cadena de ocho dígitos sin puntos ni espacios. Un DNI inválido devuelve 400 y un duplicado devuelve 409. El login sigue usando email y contraseña. Las bajas lógicas conservan su DNI reservado.
+
+Prueba de migración: `node --require tsx/cjs tests/dni.cjs` desde backend; utiliza tablas temporales y revierte todo al terminar.
+
+## Alta de dueños desde administración
+
+POST `/admin/duenos` requiere sesión de admin y recibe `nombre` (nombre y apellido obligatorios, hasta 150 caracteres), `dni` y `email`. Siempre crea un cliente, no establece cookies ni inicia sesión como el dueño. Guarda el hash de un secreto aleatorio descartado para conservar el esquema existente sin asignar una contraseña conocida. Estos dueños no tienen acceso por contraseña hasta implementar un flujo para definirla. El registro público conserva su contraseña obligatoria.
+
+GET `/admin/duenos` devuelve únicamente `id`, `nombre`, `dni` y `email` de usuarios de tipo cliente, con acceso exclusivo de administrador. En Dueños → Listado de dueños, la tabla filtra por DNI completo o parcial. Los nombres no registrados y los resultados vacíos se muestran con `-`.
+
+GET `/admin/duenos/:id` muestra los datos del dueño y sus mascotas activas. Es exclusivo de administradores, filtra por el ID del dueño y no cambia la sesión. El botón Detalle del listado abre esta vista de lectura; conserva el acceso al menú principal y permite volver al listado.

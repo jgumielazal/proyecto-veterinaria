@@ -42,3 +42,5 @@ th { font-size: .9rem; color: #576860; }
 .veterinario-perfil { display: grid; grid-template-columns: max-content 1fr; gap: 12px 24px; margin: 24px 0; }
 .veterinario-perfil dt { font-weight: 600; }
 .veterinario-perfil dd { margin: 0; overflow-wrap: anywhere; }
+.duenos-search { display: flex; align-items: center; gap: 10px; margin: 8px 0 24px; max-width: 420px; }
+.duenos-search svg { flex-shrink: 0; color: #576860; }

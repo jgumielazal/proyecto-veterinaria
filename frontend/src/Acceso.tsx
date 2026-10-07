@@ -8,6 +8,7 @@ export default function Acceso() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [iniciando, setIniciando] = useState(true);
   const [registro, setRegistro] = useState(false);
+  const [dni, setDni] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -27,7 +28,7 @@ export default function Acceso() {
     try {
       const response = await fetch(`/api/auth/${registro ? 'registro' : 'login'}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'veterinaria' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, ...(registro ? { dni } : {}) }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'No se pudo ingresar');
@@ -49,6 +50,7 @@ export default function Acceso() {
   return <main className="login"><header><p>Veterinaria</p><h1>{registro ? 'Crear cuenta de dueño' : 'Iniciar sesión'}</h1><p>{registro ? 'El registro es exclusivo para dueños de mascotas. Tu cuenta se crea automáticamente con ese rol.' : 'Ingresá para administrar tus mascotas.'}</p></header>
     {error && <p className="error" role="alert">{error}</p>}
     <section><form onSubmit={enviar}><fieldset disabled={ocupado}>
+      {registro && <label>DNI<input required inputMode="numeric" pattern="[0-9]{8}" minLength={8} maxLength={8} title="Exactamente 8 dígitos, sin puntos" value={dni} onChange={e => setDni(e.target.value)} /></label>}
       <label>Email<input type="email" autoComplete="email" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} /></label>
       <label>Contraseña<input type="password" autoComplete={registro ? 'new-password' : 'current-password'} required minLength={8} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} /></label>
       <p>Usá entre 8 y 128 caracteres.</p>

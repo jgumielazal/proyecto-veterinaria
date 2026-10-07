@@ -13,7 +13,7 @@ export = function configurarAuthRoutes(app: express.Express, negocio: ReturnType
   function responderError(res: express.Response, error: unknown, mensaje: string, log?: string) {
     if (error instanceof authNegocio.ErrorAuth) {
       const estados = {
-        no_encontrado: 404, datos_invalidos: 400, credenciales_invalidas: 401, email_registrado: 409,
+        dni_registrado: 409, no_encontrado: 404, datos_invalidos: 400, credenciales_invalidas: 401, email_registrado: 409,
         sesion_invalida: 401, sesion_vencida: 401,
       };
       res.status(estados[error.motivo]).json({ error: error.message });
@@ -70,6 +70,18 @@ export = function configurarAuthRoutes(app: express.Express, negocio: ReturnType
       return;
     }
     next();
+  });
+  app.get("/admin/duenos/:id", async (req, res) => {
+    try { res.json(await negocio.obtenerDueno(String(req.params.id))); }
+    catch (error) { responderError(res, error, "No se pudo cargar el detalle del dueño"); }
+  });
+  app.get("/admin/duenos", async (_req, res) => {
+    try { res.json(await negocio.listarDuenos()); }
+    catch (error) { responderError(res, error, "No se pudo cargar el listado de dueños"); }
+  });
+  app.post("/admin/duenos", async (req, res) => {
+    try { res.status(201).json(await negocio.crearDueno(req.body)); }
+    catch (error) { responderError(res, error, "No se pudo añadir el dueño"); }
   });
   app.post("/admin/veterinarios", async (req, res) => {
     try {

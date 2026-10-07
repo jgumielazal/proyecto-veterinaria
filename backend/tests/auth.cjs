@@ -23,9 +23,12 @@ async function req(path, method='GET', body, cookie='') {
   const desconocido = await req('/auth/login','POST',{email:'inexistente-'+Date.now()+'@example.test',password});
   assert.equal(desconocido.status,401);
   assert.deepEqual(await desconocido.json(),{error:'Email o contraseña incorrectos'});
+  for (const dni of [undefined,null,'1234567','123456789','12345678\n','12.34567',12345678]) {
+    assert.equal((await req('/auth/registro','POST',{email:emails[0],password,dni})).status,400);
+  }
   const cookies=[];
   for (const email of emails) {
-    const r=await req('/auth/registro','POST',{email,password}); assert.equal(r.status,201);
+    const r=await req('/auth/registro','POST',{email,password,dni:email===emails[0]?'90000004':'90000005'}); assert.equal(r.status,201);
     assert.match(r.headers.get('set-cookie'),/HttpOnly/i);
     assert.match(r.headers.get('set-cookie'),/SameSite=Strict/i);
     assert.match(r.headers.get('set-cookie'),/Max-Age=604800/i);
@@ -39,7 +42,8 @@ async function req(path, method='GET', body, cookie='') {
     const me = await req('/auth/me','GET',undefined,cookies.at(-1));
     assert.equal(me.status,200); assert.deepEqual(await me.json(),usuario);
   }
-  assert.equal((await req('/auth/registro','POST',{email:emails[0].toUpperCase(),password})).status,409);
+  assert.equal((await req('/auth/registro','POST',{email:'duplicate-'+emails[0],password,dni:'90000004'})).status,409);
+  assert.equal((await req('/auth/registro','POST',{email:emails[0].toUpperCase(),password,dni:'90000004'})).status,409);
   assert.equal((await req('/auth/login','POST',{email:emails[0],password:'incorrecta'})).status,401);
   assert.equal((await req('/auth/me','GET',undefined,cookies[0])).status,200);
   assert.deepEqual(await (await req('/mascotas','GET',undefined,cookies[0])).json(),[]);
@@ -77,7 +81,7 @@ async function req(path, method='GET', body, cookie='') {
   assert.match(logout.headers.get('set-cookie'),/sesion=;.*Expires=Thu, 01 Jan 1970/i);
   assert.equal((await pool.query('SELECT token_hash FROM sesiones WHERE usuario_id=$1',[ids[0]])).rowCount,0);
   assert.equal((await req('/auth/me','GET',undefined,cookies[0])).status,401);
-  r=await req('/auth/login','POST',{email:emails[0].toUpperCase(),password}); assert.equal(r.status,200); const fresh=r.headers.get('set-cookie').split(';')[0];
+  r=await req('/auth/login','POST',{email:emails[0].toUpperCase(),password,dni:'90000004'}); assert.equal(r.status,200); const fresh=r.headers.get('set-cookie').split(';')[0];
   assert.equal((await req('/auth/me','GET',undefined,fresh)).status,200);
   await pool.query('UPDATE sesiones SET expira=NOW()-INTERVAL \'1 second\' WHERE usuario_id=$1',[ids[0]]);
   assert.equal((await req('/mascotas','GET',undefined,fresh)).status,401);
