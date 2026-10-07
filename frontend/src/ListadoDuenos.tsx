@@ -1,4 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import AnadirMascotaBasica from './AnadirMascotaBasica';
+import ActualizarMascota from './ActualizarMascota';
+import DetalleMascota from './DetalleMascota';
+import type { DatosMascota } from './DetalleMascota';
+import AnadirDueno from './AnadirDueno';
 import { consultarJson, consultarListado } from './api';
 
 type Dueno = { id: number; nombre: string | null; dni: string; email: string };
@@ -7,12 +12,17 @@ export function filtrarDuenos(duenos: Dueno[], dni: string) {
   return duenos.filter(dueno => dueno.dni.includes(dni.trim()));
 }
 
-export default function ListadoDuenos() {
+export default function ListadoDuenos({ onSeleccion, onMascota }: { onSeleccion: (seleccionado: boolean) => void; onMascota: (seleccionada: boolean) => void }) {
   const [duenos, setDuenos] = useState<Dueno[]>([]);
   const [detalle, setDetalle] = useState<DetalleDueno | null>(null);
+  const [mascotaSeleccionada, setMascotaSeleccionada] = useState<DatosMascota | null>(null);
+  const [actualizandoMascota, setActualizandoMascota] = useState(false);
+  const [anadiendoMascota, setAnadiendoMascota] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const [mensaje, setMensaje] = useState('');
   const [abriendo, setAbriendo] = useState(false);
   const titulo = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { titulo.current?.focus(); }, [detalle]);
+  useEffect(() => { titulo.current?.focus(); }, [detalle, editando, anadiendoMascota]);
   const [dni, setDni] = useState('');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -25,25 +35,50 @@ export default function ListadoDuenos() {
   useEffect(() => { void cargar(); }, []);
   async function abrir(id: number) {
     setAbriendo(true); setError('');
-    try { setDetalle(await consultarJson(`/api/admin/duenos/${id}`)); }
+    try { setDetalle(await consultarJson(`/api/admin/duenos/${id}`)); setMensaje(''); onSeleccion(true); }
     catch (error) { setError(error instanceof Error ? error.message : 'No se pudo cargar el detalle'); }
     finally { setAbriendo(false); }
   }
+  async function abrirMascota(id: number) {
+    if (!detalle) return;
+    setAbriendo(true); setError('');
+    try {
+      setMascotaSeleccionada(await consultarJson(`/api/admin/duenos/${detalle.id}/mascotas/${id}`));
+      onMascota(true);
+    } catch (error) { setError(error instanceof Error ? error.message : 'No se pudo cargar la mascota'); }
+    finally { setAbriendo(false); }
+  }
+  if (mascotaSeleccionada && detalle && actualizandoMascota) return <ActualizarMascota mascota={mascotaSeleccionada} dueno={detalle} onVolver={() => setActualizandoMascota(false)} onCambio={actualizada => {
+    setMascotaSeleccionada(actualizada);
+    setDetalle({ ...detalle, mascotas: detalle.mascotas.map(item => item.id === actualizada.id ? actualizada : item) });
+  }} />;
+  if (mascotaSeleccionada) return <DetalleMascota key={mascotaSeleccionada.id} mascota={mascotaSeleccionada} onActualizar={() => setActualizandoMascota(true)} onVolver={() => { setMascotaSeleccionada(null); onMascota(false); }} />;
+  if (detalle && anadiendoMascota) return <AnadirMascotaBasica dueno={detalle} onCancelar={() => setAnadiendoMascota(false)} onGuardado={mascota => {
+    setDetalle({ ...detalle, mascotas: [...detalle.mascotas, mascota] });
+    setAnadiendoMascota(false); setMensaje('Mascota añadida al dueño seleccionado.');
+  }} />;
   if (detalle) return <div>
-    <button className="secondary admin-back" onClick={() => setDetalle(null)}>Volver al listado de dueños</button>
-    <section aria-labelledby="detalle-dueno">
+    <button className="secondary admin-back" onClick={() => { setDetalle(null); setEditando(false); setMensaje(''); onSeleccion(false); }}>Volver al listado de dueños</button>
+    {error && <p className="error" role="alert">{error}</p>}
+    {mensaje && <p className="success" role="status">{mensaje}</p>}
+    {editando ? <AnadirDueno key={detalle.id} dueno={detalle} onCancelar={() => setEditando(false)} onGuardado={actualizado => {
+      setDetalle({ ...detalle, ...actualizado });
+      setDuenos(actuales => actuales.map(item => item.id === actualizado.id ? actualizado : item));
+      setEditando(false); setMensaje('Datos del dueño actualizados.');
+    }} /> : <section aria-labelledby="detalle-dueno">
       <h2 id="detalle-dueno" ref={titulo} tabIndex={-1}>Datos del dueño</h2>
       <dl className="veterinario-perfil">
         <dt>Nombre y apellido</dt><dd>{detalle.nombre?.trim() || '-'}</dd>
         <dt>DNI</dt><dd>{detalle.dni}</dd>
         <dt>Email</dt><dd>{detalle.email}</dd>
       </dl>
-    </section>
+      <button onClick={() => { setEditando(true); setMensaje(''); }}>Editar</button>
+    </section>}
     <section aria-labelledby="mascotas-dueno">
-      <h2 id="mascotas-dueno">Mascotas registradas</h2>
+      <div className="section-header"><h2 id="mascotas-dueno">Mascotas registradas</h2><button type="button" aria-label="Añadir mascota" title="Añadir mascota" disabled={editando} onClick={() => { setAnadiendoMascota(true); setMensaje(''); }}><span aria-hidden="true">+</span></button></div>
       {detalle.mascotas.length === 0 ? <p>-</p> : <div className="table-wrap"><table>
-        <thead><tr><th scope="col">Nombre</th><th scope="col">Especie</th><th scope="col">Edad (años)</th></tr></thead>
-        <tbody>{detalle.mascotas.map(mascota => <tr key={mascota.id}><td>{mascota.nombre}</td><td>{mascota.especie}</td><td>{mascota.edad}</td></tr>)}</tbody>
+        <thead><tr><th scope="col">Nombre</th><th scope="col">Especie</th><th scope="col">Edad (años)</th><th scope="col">Acciones</th></tr></thead>
+        <tbody>{detalle.mascotas.map(mascota => <tr key={mascota.id}><td>{mascota.nombre}</td><td>{mascota.especie}</td><td>{mascota.edad}</td><td><button type="button" className="secondary" disabled={abriendo || editando} onClick={() => void abrirMascota(mascota.id)} aria-label={`Ver detalle de ${mascota.nombre}`}>Detalle</button></td></tr>)}</tbody>
       </table></div>}
     </section>
   </div>;

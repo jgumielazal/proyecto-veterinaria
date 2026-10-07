@@ -15,29 +15,32 @@ export default function Administracion() {
   const [seccion, setSeccion] = useState<Seccion | null>(null);
   const [opcionVeterinarios, setOpcionVeterinarios] = useState<'Añadir veterinario' | 'Listado de veterinarios' | null>(null);
   const [opcionDuenos, setOpcionDuenos] = useState<'Añadir dueño' | 'Listado de dueños' | null>(null);
+  const [mascotaSeleccionada, setMascotaSeleccionada] = useState(false);
+  const [duenoSeleccionado, setDuenoSeleccionado] = useState(false);
   const titulo = useRef<HTMLHeadingElement>(null);
   const primeraVista = useRef(true);
 
   useEffect(() => {
     if (primeraVista.current) primeraVista.current = false;
     else titulo.current?.focus();
-  }, [seccion, opcionVeterinarios, opcionDuenos]);
+  }, [seccion, opcionVeterinarios, opcionDuenos, mascotaSeleccionada]);
 
   return <main>
     {seccion && <div className="actions admin-back"><button className="secondary" onClick={() => {
       if (opcionVeterinarios) setOpcionVeterinarios(null);
-      else if (opcionDuenos) setOpcionDuenos(null);
+      else if (opcionDuenos) { setOpcionDuenos(null); setDuenoSeleccionado(false); setMascotaSeleccionada(false); }
       else setSeccion(null);
     }}>← {opcionVeterinarios ? 'Volver a Veterinarios' : opcionDuenos ? 'Volver a Dueños' : 'Volver al menú principal'}</button>
       {(opcionVeterinarios || opcionDuenos) && <button type="button" className="secondary" onClick={() => {
         setOpcionVeterinarios(null);
         setOpcionDuenos(null);
+        setDuenoSeleccionado(false); setMascotaSeleccionada(false);
         setSeccion(null);
       }}>Ir al menú principal</button>}
     </div>}
     <header>
       <p>Panel de administrador</p>
-      <h1 ref={titulo} tabIndex={-1}>{opcionVeterinarios ?? opcionDuenos ?? seccion ?? 'Menú principal'}</h1>
+      <h1 ref={titulo} tabIndex={-1}>{mascotaSeleccionada ? <strong>Mascota seleccionada</strong> : duenoSeleccionado ? <strong>Dueño seleccionado</strong> : opcionVeterinarios ?? opcionDuenos ?? seccion ?? 'Menú principal'}</h1>
       <p>{opcionVeterinarios ? 'Veterinarios' : opcionDuenos ? 'Dueños' : seccion ? secciones.find(item => item.nombre === seccion)?.descripcion : 'Elegí una sección para continuar.'}</p>
     </header>
     {seccion === null ? <nav className="admin-menu" aria-label="Menú principal del administrador">
@@ -66,7 +69,7 @@ export default function Administracion() {
           <span className="admin-card-description">{opcion === 'Añadir dueño' ? 'Registrá una cuenta de dueño.' : 'Consultá los clientes y filtrá por DNI.'}</span>
           <span className="admin-card-link">Ingresar →</span>
         </button>)}
-      </nav> : opcionDuenos === 'Añadir dueño' ? <AnadirDueno /> : <ListadoDuenos />
+      </nav> : opcionDuenos === 'Añadir dueño' ? <AnadirDueno onCancelar={() => setOpcionDuenos(null)} /> : <ListadoDuenos onSeleccion={setDuenoSeleccionado} onMascota={setMascotaSeleccionada} />
     ) : <section>
       <h2>Administración general</h2>
       <p>Las funciones de esta sección todavía no están disponibles.</p>

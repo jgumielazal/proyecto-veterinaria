@@ -71,6 +71,26 @@ export = function configurarAuthRoutes(app: express.Express, negocio: ReturnType
     }
     next();
   });
+  app.put("/admin/duenos/:id/mascotas/:mascotaId", async (req, res) => {
+    try { res.json(await negocio.editarMascotaDueno(String(req.params.id), String(req.params.mascotaId), req.body)); }
+    catch (error) { responderError(res, error, "No se pudo actualizar la mascota"); }
+  });
+  app.post("/admin/duenos/:id/mascotas/:mascotaId/reportes", async (req, res) => {
+    try { res.status(201).json(await negocio.agregarReporteDueno(String(req.params.id), String(req.params.mascotaId), req.body)); }
+    catch (error) { responderError(res, error, "No se pudo guardar el reporte"); }
+  });
+  app.get("/admin/duenos/:id/mascotas/:mascotaId", async (req, res) => {
+    try { res.json(await negocio.obtenerMascotaDueno(String(req.params.id), String(req.params.mascotaId))); }
+    catch (error) { responderError(res, error, "No se pudo cargar la mascota"); }
+  });
+  app.post("/admin/duenos/:id/mascotas", async (req, res) => {
+    try { res.status(201).json(await negocio.crearMascotaDueno(String(req.params.id), req.body)); }
+    catch (error) { responderError(res, error, "No se pudo añadir la mascota"); }
+  });
+  app.put("/admin/duenos/:id", async (req, res) => {
+    try { res.json(await negocio.editarDueno(String(req.params.id), req.body)); }
+    catch (error) { responderError(res, error, "No se pudieron guardar los datos del dueño"); }
+  });
   app.get("/admin/duenos/:id", async (req, res) => {
     try { res.json(await negocio.obtenerDueno(String(req.params.id))); }
     catch (error) { responderError(res, error, "No se pudo cargar el detalle del dueño"); }

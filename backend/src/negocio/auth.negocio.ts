@@ -18,6 +18,16 @@ function duplicado(error: unknown) {
   }
   throw new ErrorAuth("email_registrado", "Ese email ya está registrado");
 }
+function validarIdsMascota(duenoId: string, mascotaId: string) {
+  for (const valor of [duenoId, mascotaId]) {
+    if (!/^[1-9]\d*$/.test(valor) || !Number.isSafeInteger(Number(valor)) || Number(valor) > 2147483647) throw new ErrorAuth("datos_invalidos", "Identificador inválido");
+  }
+}
+function validarFecha(fecha: unknown): asserts fecha is string {
+  if (typeof fecha !== "string" || fecha.length !== 10 || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(fecha) || fecha.startsWith('0000')) throw new ErrorAuth("datos_invalidos", "Ingresá una fecha válida.");
+  const parsed = new Date(`${fecha}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0,10) !== fecha) throw new ErrorAuth("datos_invalidos", "Ingresá una fecha válida.");
+}
 const digest = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
 function derivar(password: string, salt: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -101,6 +111,79 @@ function crearAuthNegocio(dao: ReturnType<typeof crearAuthDao>) {
         if ((error as { code?: string }).code === "23505") {
           duplicado(error);
         }
+        throw error;
+      }
+    },
+    async editarMascotaDueno(duenoId: string, mascotaId: string, entrada: unknown) {
+      validarIdsMascota(duenoId, mascotaId);
+      const { nombre, especie, edad, fecha } = (entrada ?? {}) as Record<string, unknown>;
+      if (typeof nombre !== "string" || !nombre.trim() || nombre.trim().length > 150 ||
+          typeof especie !== "string" || !especie.trim() || especie.trim().length > 100 ||
+          typeof edad !== "number" || !Number.isInteger(edad) || edad < 0 || edad > 2147483647) throw new ErrorAuth("datos_invalidos", "Revisá nombre, especie y edad de la mascota.");
+      if (fecha !== null) validarFecha(fecha);
+      const mascota = await dao.editarMascotaDueno(Number(duenoId), Number(mascotaId), { nombre: nombre.trim(), especie: especie.trim(), edad, fecha });
+      if (!mascota) throw new ErrorAuth("no_encontrado", "No se encontró la mascota de este dueño");
+      return mascota;
+    },
+    async agregarReporteDueno(duenoId: string, mascotaId: string, entrada: unknown) {
+      validarIdsMascota(duenoId, mascotaId);
+      const { texto, fecha } = (entrada ?? {}) as Record<string, unknown>;
+      if (typeof texto !== "string" || !texto.trim() || texto.length > 10000) throw new ErrorAuth("datos_invalidos", "Ingresá un reporte de hasta 10000 caracteres.");
+      validarFecha(fecha);
+      const reporte = await dao.agregarReporteDueno(Number(duenoId), Number(mascotaId), texto.trim(), fecha);
+      if (!reporte) throw new ErrorAuth("no_encontrado", "No se encontró la mascota de este dueño");
+      return reporte;
+    },
+    async obtenerMascotaDueno(duenoId: string, mascotaId: string) {
+      for (const valor of [duenoId, mascotaId]) {
+        if (!/^[1-9]\d*$/.test(valor) || !Number.isSafeInteger(Number(valor)) || Number(valor) > 2147483647) {
+          throw new ErrorAuth("datos_invalidos", "Identificador inválido");
+        }
+      }
+      const mascota = await dao.obtenerMascotaDueno(Number(duenoId), Number(mascotaId));
+      if (!mascota) throw new ErrorAuth("no_encontrado", "No se encontró la mascota de este dueño");
+      return mascota;
+    },
+    async crearMascotaDueno(valor: string, entrada: unknown) {
+      if (!/^[1-9]\d*$/.test(valor) || !Number.isSafeInteger(Number(valor)) || Number(valor) > 2147483647) {
+        throw new ErrorAuth("datos_invalidos", "Identificador de dueño inválido");
+      }
+      const { nombre, especie, edad, raza = '', pedigree = false, descripcion = '', reporte = '', fecha } = (entrada ?? {}) as Record<string, unknown>;
+      if (typeof nombre !== "string" || !nombre.trim() || nombre.trim().length > 150 ||
+          typeof especie !== "string" || !especie.trim() || especie.trim().length > 100 ||
+          typeof edad !== "number" || !Number.isInteger(edad) || edad < 0 || edad > 2147483647 ||
+          typeof raza !== "string" || raza.trim().length > 150 || typeof pedigree !== "boolean" ||
+          typeof descripcion !== "string" || descripcion.length > 2000 ||
+          typeof reporte !== "string" || reporte.length > 10000) {
+        throw new ErrorAuth("datos_invalidos", "Revisá los datos de la mascota. Nombre, especie y edad entera no negativa son obligatorios.");
+      }
+      if (typeof fecha !== "string" || fecha.length !== 10 || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(fecha) || fecha.startsWith('0000')) {
+        throw new ErrorAuth("datos_invalidos", "Ingresá una fecha válida.");
+      }
+      const fechaParsed = new Date(`${fecha}T00:00:00Z`);
+      if (Number.isNaN(fechaParsed.getTime()) || fechaParsed.toISOString().slice(0,10) !== fecha) {
+        throw new ErrorAuth("datos_invalidos", "Ingresá una fecha válida.");
+      }
+      const mascota = await dao.crearMascotaDueno(Number(valor), { nombre: nombre.trim(), especie: especie.trim(), edad, raza: raza.trim(), pedigree, descripcion: descripcion.trim(), reporte: reporte.trim(), fecha });
+      if (!mascota) throw new ErrorAuth("no_encontrado", "No se encontró el dueño");
+      return mascota;
+    },
+    async editarDueno(valor: string, entrada: unknown) {
+      if (!/^[1-9]\d*$/.test(valor) || !Number.isSafeInteger(Number(valor)) || Number(valor) > 2147483647) {
+        throw new ErrorAuth("datos_invalidos", "Identificador de dueño inválido");
+      }
+      const { nombre, dni, email } = (entrada ?? {}) as Record<string, unknown>;
+      validarDni(dni);
+      if (typeof nombre !== "string" || nombre.trim().length > 150 || nombre.trim().split(/\s+/).length < 2 ||
+          typeof email !== "string" || email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        throw new ErrorAuth("datos_invalidos", "Ingresá nombre y apellido (hasta 150 caracteres) y un email válido.");
+      }
+      try {
+        const dueno = await dao.editarDueno(Number(valor), nombre.trim(), dni, email.trim().toLowerCase());
+        if (!dueno) throw new ErrorAuth("no_encontrado", "No se encontró el dueño");
+        return dueno;
+      } catch (error) {
+        if ((error as { code?: string }).code === "23505") duplicado(error);
         throw error;
       }
     },
