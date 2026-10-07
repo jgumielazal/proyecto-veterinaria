@@ -29,4 +29,16 @@ th { font-size: .9rem; color: #576860; }
 @media (max-width: 600px) { main { margin: 24px auto; padding: 0 12px; } section { padding: 16px; } .fields { grid-template-columns: 1fr; } .section-header { align-items: flex-start; flex-direction: column; } th, td { padding: 12px 6px; } }
 .login { max-width: 480px; }
 .login label { margin-bottom: 16px; }
+.admin-menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 20px; }
+.admin-card { display: flex; flex-direction: column; gap: 16px; padding: 24px; text-align: left; background: white; color: #24342f; border: 1px solid #d9e1dd; border-radius: 10px; }
+.admin-card:hover { border-color: #216348; background: #edf5f0; }
+.admin-card-title { font-size: 1.3rem; font-weight: 700; }
+.admin-card-description { color: #576860; line-height: 1.5; }
+.admin-card-link { margin-top: auto; color: #216348; font-weight: 600; }
+.admin-back { margin-bottom: 24px; }
+.veterinarios-form { max-width: 480px; }
+.veterinarios-form label { margin-bottom: 16px; }
 .session-bar { max-width: 960px; margin: 20px auto; padding: 0 20px; display: flex; gap: 16px; align-items: center; justify-content: flex-end; flex-wrap: wrap; overflow-wrap: anywhere; }
+.veterinario-perfil { display: grid; grid-template-columns: max-content 1fr; gap: 12px 24px; margin: 24px 0; }
+.veterinario-perfil dt { font-weight: 600; }
+.veterinario-perfil dd { margin: 0; overflow-wrap: anywhere; }

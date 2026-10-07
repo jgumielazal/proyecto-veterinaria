@@ -17,6 +17,8 @@ const db = new Client(process.env.DATABASE_URL
   await db.query('CREATE TEMP TABLE sesiones (token_hash TEXT PRIMARY KEY, usuario_id INTEGER NOT NULL, expira TIMESTAMPTZ NOT NULL) ON COMMIT DROP');
   await db.query('SET LOCAL search_path TO pg_temp');
   await db.query(fs.readFileSync(path.join(__dirname, '../migrations/004_tipos_usuario.sql'), 'utf8'));
+  await db.query(fs.readFileSync(path.join(__dirname, '../migrations/007_estado_usuarios.sql'), 'utf8'));
+  assert.equal((await db.query('SELECT activo FROM usuarios')).rows[0].activo, true);
   assert.equal((await db.query('SELECT tipo FROM usuarios')).rows[0].tipo, 'cliente');
   const dao = crearDao(db);
   const negocio = crearAuthNegocio(dao);

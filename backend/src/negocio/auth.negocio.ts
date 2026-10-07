@@ -2,7 +2,7 @@ import crypto = require("node:crypto");
 import crearAuthDao = require("../dao/auth.dao");
 
 class ErrorAuth extends Error {
-  constructor(public readonly motivo: "datos_invalidos" | "credenciales_invalidas" | "email_registrado" | "sesion_invalida" | "sesion_vencida", mensaje: string) {
+  constructor(public readonly motivo: "no_encontrado" | "datos_invalidos" | "credenciales_invalidas" | "email_registrado" | "sesion_invalida" | "sesion_vencida", mensaje: string) {
     super(mensaje);
   }
 }
@@ -70,6 +70,31 @@ function crearAuthNegocio(dao: ReturnType<typeof crearAuthDao>) {
         }
         throw error;
       }
+    },
+    async listarVeterinarios() { return dao.listarVeterinarios(); },
+    async gestionarVeterinario(accion: "ver" | "editar" | "baja", valor: string, entrada?: unknown) {
+      if (!/^[1-9]\d*$/.test(valor) || !Number.isSafeInteger(Number(valor)) || Number(valor) > 2147483647) {
+        throw new ErrorAuth("datos_invalidos", "Identificador de veterinario inválido");
+      }
+      const id = Number(valor);
+      let veterinario;
+      try {
+        if (accion === "editar") {
+          const { nombre, email, matricula, especialidad } = (entrada ?? {}) as Record<string, unknown>;
+          if (typeof nombre !== "string" || !nombre.trim() || nombre.trim().length > 150 ||
+              typeof email !== "string" || email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
+              typeof matricula !== "string" || !matricula.trim() || matricula.trim().length > 80 ||
+              typeof especialidad !== "string" || !especialidad.trim() || especialidad.trim().length > 150) {
+            throw new ErrorAuth("datos_invalidos", "Completá nombre, email válido, matrícula y especialidad dentro de los límites permitidos.");
+          }
+          veterinario = await dao.editarVeterinario(id, nombre.trim(), email.trim().toLowerCase(), matricula.trim(), especialidad.trim());
+        } else veterinario = accion === "baja" ? await dao.bajaVeterinario(id) : await dao.obtenerVeterinario(id);
+      } catch (error) {
+        if ((error as { code?: string }).code === "23505") throw new ErrorAuth("email_registrado", "Ese email ya está registrado");
+        throw error;
+      }
+      if (!veterinario) throw new ErrorAuth("no_encontrado", "No se encontró el veterinario");
+      return veterinario;
     },
     async cerrarSesion(valor: string) {
       await dao.eliminarSesion(digest(valor));

@@ -45,10 +45,37 @@ const server = app.listen(0, '127.0.0.1', async () => {
     assert.equal(ownerResponse.status,201); const owner = await ownerResponse.json(); ids.push(owner.id); assert.equal(owner.tipo,'cliente');
     assert.equal((await req('/admin/veterinarios',body,ownerResponse.headers.get('set-cookie').split(';')[0])).status,403);
     assert.equal((await (await req('/auth/me',undefined,cookie,'GET')).json()).tipo,'admin');
+    const path = `/admin/veterinarios/${vet.id}`;
+    const list = await (await req('/admin/veterinarios',undefined,cookie,'GET')).json();
+    assert.ok(list.some(item => item.id === vet.id && item.activo));
+    assert.ok(list.every(item => item.tipo === 'veterinario' && !('password_hash' in item)));
+    for (const method of ['GET', 'PUT', 'DELETE']) {
+      assert.equal((await req(path,method === 'PUT' ? body : undefined,undefined,method)).status,401);
+      assert.equal((await req(path,method === 'PUT' ? body : undefined,vetCookie,method)).status,403);
+      assert.equal((await req(`/admin/veterinarios/${owner.id}`,method === 'PUT' ? body : undefined,cookie,method)).status,404);
+    }
+    assert.equal((await req('/admin/veterinarios/no-valido',undefined,cookie,'GET')).status,400);
+    const perfil = await (await req(path,undefined,cookie,'GET')).json();
+    assert.equal(perfil.nombre,'Veterinaria Prueba'); assert.equal(perfil.activo,true);
+    assert.equal(perfil.password_hash,undefined);
+    assert.equal((await req(path,{...body,nombre:''},cookie,'PUT')).status,400);
+    assert.equal((await req(path,{...body,email:admin.email},cookie,'PUT')).status,409);
+    const edited = await req(path,{...body,nombre:'Nombre actualizado',matricula:'MAT-002',activo:false,tipo:'admin'},cookie,'PUT');
+    assert.equal(edited.status,200);
+    const updated = await edited.json(); assert.equal(updated.nombre,'Nombre actualizado'); assert.equal(updated.matricula,'MAT-002'); assert.equal(updated.activo,true); assert.equal(updated.tipo,'veterinario');
+    assert.equal((await req('/auth/login',{email:vet.email,password})).status,200);
+    const baja = await req(path,undefined,cookie,'DELETE'); assert.equal(baja.status,200); assert.equal((await baja.json()).activo,false);
+    assert.equal((await req(path,undefined,cookie,'DELETE')).status,200);
+    const persisted = (await pool.query('SELECT activo,nombre FROM usuarios WHERE id=$1',[vet.id])).rows[0];
+    assert.equal(persisted.activo,false); assert.equal(persisted.nombre,'Nombre actualizado');
+    assert.equal((await req('/auth/me',undefined,vetCookie,'GET')).status,401);
+    assert.equal((await req('/auth/login',{email:vet.email,password})).status,401);
+    const after = await (await req('/admin/veterinarios',undefined,cookie,'GET')).json();
+    assert.ok(after.some(item => item.id === vet.id && !item.activo));
     await pool.query("UPDATE usuarios SET tipo='cliente' WHERE id=$1",[admin.id]);
     assert.equal((await req('/admin/veterinarios',body,cookie)).status,403);
     assert.equal((await req('/auth/login',{email:vet.email,password:'incorrecta'})).status,401);
-    console.log('OK: admin crea veterinario, validaciones, duplicados, persistencia, login, sesión, registro público y rechazo de anónimos/dueños/veterinarios/admin revocado.');
+    console.log('OK: creación, listado, perfil, edición, validaciones, permisos, baja lógica persistente y bloqueo de acceso/sesiones de inactivos.');
   } catch(e) { console.error(e); process.exitCode=1; }
   finally { if(ids.length) await pool.query('DELETE FROM usuarios WHERE id=ANY($1::int[])',[ids]); server.close(); await pool.end(); }
 });

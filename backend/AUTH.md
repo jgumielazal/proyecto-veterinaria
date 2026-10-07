@@ -38,7 +38,7 @@ existente se actualiza `usuarios.tipo` directamente en la base de datos.
 
 Esta clasificación no modifica permisos: todos los tipos conservan acceso solo
 a sus propias mascotas. Las respuestas de autenticación incluyen `id`, `email` y `tipo`.
-El administrador ve la pantalla de administración al iniciar sesión.
+El administrador ve un menú principal con Veterinarios, Dueños y Administración al iniciar sesión. Dentro de Veterinarios están Crear veterinario y Listado de veterinarios; el listado incluye activos e inactivos y permite abrir el perfil de solo lectura, editar sus datos o darlo de baja lógica. El botón Ir al menú principal sigue disponible; las otras dos secciones indican que sus funciones aún no están disponibles.
 
 
 ## Alta de veterinarios por administradores
@@ -60,3 +60,14 @@ porque puede depender de la jurisdicción. Las contraseñas se guardan con scryp
 
 Prueba de integración: desde backend, `node --require tsx/cjs tests/admin.cjs`.
 Usa un servidor temporal y limpia únicamente las cuentas creadas por la prueba.
+
+## Gestión de veterinarios
+
+Requiere aplicar `007_estado_usuarios.sql` mediante el ejecutor de migraciones.
+
+- GET `/admin/veterinarios`: lista profesionales activos e inactivos.
+- GET `/admin/veterinarios/:id`: perfil con nombre, email, matrícula, especialidad y activo.
+- PUT `/admin/veterinarios/:id`: modifica nombre, email, matrícula y especialidad; conserva contraseña, rol y estado.
+- DELETE `/admin/veterinarios/:id`: establece `activo = false`, sin eliminar el usuario. Repetir la baja es seguro.
+
+Todas las rutas requieren sesión de administrador; las escrituras requieren el encabezado habitual. Devuelven 404 si no existe un veterinario con ese identificador. Los usuarios inactivos no pueden iniciar sesión y sus sesiones existentes dejan de autenticar. No se exponen hashes de contraseñas.
