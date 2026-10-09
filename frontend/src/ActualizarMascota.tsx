@@ -20,9 +20,14 @@ export default function ActualizarMascota({ mascota, dueno, onCambio, onVolver }
   const [mensaje, setMensaje] = useState('');
   const titulo = useRef<HTMLHeadingElement>(null);
   useEffect(() => { titulo.current?.focus(); }, [editando]);
+  useEffect(() => {
+    if (!mensaje) return;
+    const temporizador = setTimeout(() => setMensaje(''), 15000);
+    return () => clearTimeout(temporizador);
+  }, [mensaje]);
   async function guardarReporte(event: FormEvent) {
     event.preventDefault(); setError(''); setMensaje('');
-    if (fecha > fechaLocalHoy()) { setError('La fecha del reporte no puede ser posterior a hoy.'); return; }
+    if (fecha !== fechaLocalHoy()) { setFecha(fechaLocalHoy()); setError('La fecha del reporte debe ser la de hoy.'); return; }
     setOcupado(true);
     try {
       const reporte: DatosMascota['reportes'][number] = await consultarJson(`/api/admin/duenos/${dueno.id}/mascotas/${mascota.id}/reportes`, {
@@ -37,20 +42,20 @@ export default function ActualizarMascota({ mascota, dueno, onCambio, onVolver }
   return <div>
     <button className="secondary admin-back" disabled={ocupado} onClick={onVolver}>Volver a mascota seleccionada</button>
     <h2 ref={titulo} tabIndex={-1}>Actualización y reportes</h2>
-    {mensaje && <p className="success" role="status">{mensaje}</p>}
     {editando ? <AnadirMascotaBasica mascota={mascota} dueno={dueno} onCancelar={() => setEditando(false)} onGuardado={datos => {
       onCambio({ ...mascota, ...datos, fecha: datos.fecha ?? null });
       setEditando(false); setMensaje('Datos de la mascota actualizados.');
-    }} /> : <section aria-labelledby="datos-animal-reporte">
+    }} /> : <section className="datos-animal-reporte" aria-labelledby="datos-animal-reporte">
       <div className="section-header"><h2 id="datos-animal-reporte">Datos del animal</h2><button disabled={ocupado} onClick={() => { setEditando(true); setMensaje(''); }}>Editar</button></div>
       <DatosAnimal mascota={mascota} />
     </section>}
+    <p className={`success reporte-confirmacion${mensaje ? '' : ' oculto'}`} role="status">{mensaje || '\u00a0'}</p>
     <section aria-labelledby="nuevo-reporte">
       <h2 id="nuevo-reporte">Nuevo reporte</h2>
       {error && <p className="error" role="alert">{error}</p>}
       <form onSubmit={guardarReporte}><fieldset disabled={ocupado || editando} className="mascota-form">
         <label>Reporte<textarea required rows={8} maxLength={10000} value={texto} onChange={e => setTexto(e.target.value)} /></label>
-        <label>Fecha del reporte<input required type="date" min="0001-01-01" max={fechaLocalHoy()} value={fecha} onChange={e => setFecha(e.target.value)} /></label>
+        <label>Fecha del reporte<input required type="date" min={fechaLocalHoy()} max={fechaLocalHoy()} value={fecha} onChange={() => setFecha(fechaLocalHoy())} /></label>
         <div className="actions dueno-form-actions"><button type="submit">{ocupado ? 'Guardando…' : 'Guardar reporte'}</button><button type="button" className="cancelar-dueno" onClick={onVolver}>Cancelar</button></div>
       </fieldset></form>
     </section>

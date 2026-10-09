@@ -42,6 +42,10 @@ th { font-size: .9rem; color: #576860; }
 .veterinario-perfil { display: grid; grid-template-columns: max-content 1fr; gap: 12px 24px; margin: 24px 0; }
 .veterinario-perfil dt { font-weight: 600; }
 .veterinario-perfil dd { margin: 0; overflow-wrap: anywhere; }
+.datos-animal { margin-bottom: 0; }
+.datos-animal-reporte { margin-bottom: 8px; }
+.reporte-confirmacion { margin: 0 0 8px; line-height: 24px; }
+.reporte-confirmacion.oculto { visibility: hidden; }
 .duenos-search { display: flex; align-items: center; gap: 10px; margin: 8px 0 24px; max-width: 420px; }
 .duenos-search svg { flex-shrink: 0; color: #576860; }
 .dueno-form-actions { justify-content: space-between; }

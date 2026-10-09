@@ -13,7 +13,7 @@ function fechaVisible(fecha: string | null) {
 }
 export function DatosAnimal({ mascota }: { mascota: DatosMascota }) {
   return (
-      <dl className="veterinario-perfil">
+      <dl className="veterinario-perfil datos-animal">
         <dt>Nombre</dt><dd>{mascota.nombre}</dd>
         <dt>Especie</dt><dd>{mascota.especie}</dd>
         <dt>Edad (años)</dt><dd>{mascota.edad}</dd>
