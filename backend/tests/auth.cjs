@@ -12,7 +12,7 @@ async function req(path, method='GET', body, cookie='') {
 }
 (async () => {
   for (const method of ['GET','POST','PUT','DELETE']) assert.equal((await req('/mascotas'+(['PUT','DELETE'].includes(method)?'/1':''),method)).status,401);
-  assert.equal((await req('/auth/registro','POST',{email:'mal',password:'corta'})).status,400);
+  assert.equal((await req('/auth/registro','POST',{email:'mal',password:'corta'})).status,404);
   for (const cookie of ['', 'sesion=invalida', 'sesion='+'a'.repeat(64)]) {
     const respuesta = await req('/auth/me','GET',undefined,cookie);
     assert.equal(respuesta.status,401);
@@ -23,30 +23,29 @@ async function req(path, method='GET', body, cookie='') {
   const desconocido = await req('/auth/login','POST',{email:'inexistente-'+Date.now()+'@example.test',password});
   assert.equal(desconocido.status,401);
   assert.deepEqual(await desconocido.json(),{error:'Email o contraseña incorrectos'});
-  for (const dni of [undefined,null,'1234567','123456789','12345678\n','12.34567',12345678]) {
-    assert.equal((await req('/auth/registro','POST',{email:emails[0],password,dni})).status,400);
-  }
   const cookies=[];
   for (const email of emails) {
-    const r=await req('/auth/registro','POST',{email,password,dni:email===emails[0]?'90000004':'90000005'}); assert.equal(r.status,201);
+    const fixture = await require('./fixture-usuario.cjs')(pool,email,password,email===emails[0]?'90000004':'90000005'); ids.push(fixture.id);
+    const r=await req('/auth/login','POST',{email,password}); assert.equal(r.status,200);
     assert.match(r.headers.get('set-cookie'),/HttpOnly/i);
     assert.match(r.headers.get('set-cookie'),/SameSite=Strict/i);
     assert.match(r.headers.get('set-cookie'),/Max-Age=604800/i);
     const usuario = await r.json();
     assert.deepEqual(Object.keys(usuario).sort(),['email','id','tipo']);
     assert.equal(usuario.email,email);
-    ids.push(usuario.id); cookies.push(r.headers.get('set-cookie').split(';')[0]);
+    cookies.push(r.headers.get('set-cookie').split(';')[0]);
     const token = cookies.at(-1).slice('sesion='.length);
     const sesion = await pool.query('SELECT token_hash, expira > NOW() AS vigente FROM sesiones WHERE usuario_id=$1',[usuario.id]);
     assert.deepEqual(sesion.rows,[{token_hash:createHash('sha256').update(token).digest('hex'),vigente:true}]);
     const me = await req('/auth/me','GET',undefined,cookies.at(-1));
     assert.equal(me.status,200); assert.deepEqual(await me.json(),usuario);
   }
-  assert.equal((await req('/auth/registro','POST',{email:'duplicate-'+emails[0],password,dni:'90000004'})).status,409);
-  assert.equal((await req('/auth/registro','POST',{email:emails[0].toUpperCase(),password,dni:'90000004'})).status,409);
   assert.equal((await req('/auth/login','POST',{email:emails[0],password:'incorrecta'})).status,401);
   assert.equal((await req('/auth/me','GET',undefined,cookies[0])).status,200);
   assert.deepEqual(await (await req('/mascotas','GET',undefined,cookies[0])).json(),[]);
+  for (const method of ['POST','PUT','DELETE']) assert.equal((await req('/mascotas'+(method==='POST'?'':'/1'),method,{},cookies[0])).status,403);
+  // El CRUD continúa disponible para veterinarios; los clientes solo consultan.
+  await pool.query("UPDATE usuarios SET tipo='veterinario' WHERE id=ANY($1::int[])",[ids]);
   const errorDatos = {error:'Nombre y especie son obligatorios. Edad debe ser un número entero entre 0 y 2147483647.'};
   for (const datos of [{}, {nombre:' ',especie:'gato',edad:1}, {nombre:'Prueba',especie:' ',edad:1},
     ...[-1, 1.5, 2147483648, '2', null].map(edad => ({nombre:'Prueba',especie:'gato',edad}))]) {
@@ -92,13 +91,13 @@ async function req(path, method='GET', body, cookie='') {
   assert.equal((await fetch(origin+'/auth/logout',{method:'POST',headers:{Cookie:cookies[1]}})).status,403);
   // Los intentos inválidos no bloquean el login posterior.
   for (let i=0; i<25; i++) {
-    assert.equal((await req(i % 2 ? '/auth/login' : '/auth/registro','POST',{})).status,400);
+    assert.equal((await req('/auth/login','POST',{})).status,400);
   }
   const sinBloqueo = await req('/auth/login','POST',{email:emails[1],password});
   assert.equal(sinBloqueo.status,200);
   assert.equal((await req('/auth/me','GET',undefined,cookies[1])).status,200);
   assert.equal((await req('/auth/logout','POST',undefined,cookies[1])).status,204);
-  console.log('OK: registro, login, validaciones, cookies, CRUD propio, aislamiento entre usuarios, logout, expiración y protección CSRF.');
+  console.log('OK: registro público deshabilitado, login, validaciones, cookies, CRUD propio, aislamiento entre usuarios, logout, expiración y protección CSRF.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   // Solo elimina registros de las cuentas efímeras creadas por esta prueba.
   if(ids.length) {await pool.query('DELETE FROM mascotas WHERE usuario_id = ANY($1::int[])',[ids]); await pool.query('DELETE FROM usuarios WHERE id = ANY($1::int[])',[ids]);}

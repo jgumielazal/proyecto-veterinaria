@@ -32,17 +32,24 @@ export = function configurarAuthRoutes(app: express.Express, negocio: ReturnType
   });
 
   app.use("/auth", (_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
-  for (const accion of ["registro", "login"] as const) {
-    app.post(`/auth/${accion}`, async (req, res) => {
+  app.post("/auth/login", async (req, res) => {
       try {
-        const sesion = await negocio.acceder(accion, req.body);
+        const sesion = await negocio.acceder(req.body);
+        if ("pendiente" in sesion) { res.json(sesion); return; }
         res.cookie("sesion", sesion.token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
-        res.status(accion === "registro" ? 201 : 200).json(sesion.usuario);
+        res.status(200).json(sesion.usuario);
       } catch (error) {
         responderError(res, error, "No se pudo completar el acceso", "Error de autenticación:");
       }
     });
-  }
+
+  app.post("/auth/activar", async (req, res) => {
+    try {
+      const sesion = await negocio.activar(req.body);
+      res.cookie("sesion", sesion.token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+      res.json(sesion.usuario);
+    } catch (error) { responderError(res, error, "No se pudo activar la cuenta"); }
+  });
 
   app.post("/auth/logout", async (req, res) => {
     try {
@@ -64,8 +71,23 @@ export = function configurarAuthRoutes(app: express.Express, negocio: ReturnType
     }
   };
   app.get("/auth/me", autenticar, (_req, res) => { res.json(res.locals.usuario); });
-  app.use("/admin", autenticar, (_req, res, next) => {
-    if (res.locals.usuario.tipo !== "admin") {
+  app.use("/dueno", autenticar, (_req, res, next) => {
+    if (res.locals.usuario.tipo !== "cliente") { res.status(403).json({ error: "Acceso exclusivo para dueños" }); return; }
+    next();
+  });
+  app.get("/dueno", async (_req, res) => {
+    try { res.json(await negocio.obtenerDueno(String(res.locals.usuario.id))); }
+    catch (error) { responderError(res, error, "No se pudieron cargar tus datos"); }
+  });
+  app.get("/dueno/mascotas/:id", async (req, res) => {
+    try { res.json(await negocio.obtenerMascotaDueno(String(res.locals.usuario.id), String(req.params.id))); }
+    catch (error) { responderError(res, error, "No se pudo cargar la mascota"); }
+  });
+  app.use("/admin", autenticar, (req, res, next) => {
+    const esAdmin = res.locals.usuario.tipo === "admin";
+    const esVeterinarioEnDuenos = res.locals.usuario.tipo === "veterinario" &&
+      (req.path === "/duenos" || req.path.startsWith("/duenos/"));
+    if (!esAdmin && !esVeterinarioEnDuenos) {
       res.status(403).json({ error: "Solo los administradores pueden acceder a esta función" });
       return;
     }
@@ -120,5 +142,10 @@ export = function configurarAuthRoutes(app: express.Express, negocio: ReturnType
       catch (error) { responderError(res, error, "No se pudo completar la operación del veterinario"); }
     });
   }
-  app.use("/mascotas", autenticar);
+  app.use("/mascotas", autenticar, (req, res, next) => {
+    if (res.locals.usuario.tipo === "cliente" && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+      res.status(403).json({ error: "Los dueños tienen acceso de solo lectura" }); return;
+    }
+    next();
+  });
 };

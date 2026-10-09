@@ -4,6 +4,7 @@ import ActualizarMascota from './ActualizarMascota';
 import DetalleMascota from './DetalleMascota';
 import type { DatosMascota } from './DetalleMascota';
 import AnadirDueno from './AnadirDueno';
+import type { DatosDueno } from './AnadirDueno';
 import { consultarJson, consultarListado } from './api';
 
 type Dueno = { id: number; nombre: string | null; dni: string; email: string };
@@ -12,9 +13,9 @@ export function filtrarDuenos(duenos: Dueno[], dni: string) {
   return duenos.filter(dueno => dueno.dni.includes(dni.trim()));
 }
 
-export default function ListadoDuenos({ onSeleccion, onMascota }: { onSeleccion: (seleccionado: boolean) => void; onMascota: (seleccionada: boolean) => void }) {
+export default function ListadoDuenos({ onSeleccion, onMascota, duenoInicial }: { duenoInicial?: DatosDueno; onSeleccion: (seleccionado: boolean) => void; onMascota: (seleccionada: boolean) => void }) {
   const [duenos, setDuenos] = useState<Dueno[]>([]);
-  const [detalle, setDetalle] = useState<DetalleDueno | null>(null);
+  const [detalle, setDetalle] = useState<DetalleDueno | null>(() => duenoInicial ? { ...duenoInicial, mascotas: [] } : null);
   const [mascotaSeleccionada, setMascotaSeleccionada] = useState<DatosMascota | null>(null);
   const [actualizandoMascota, setActualizandoMascota] = useState(false);
   const [anadiendoMascota, setAnadiendoMascota] = useState(false);

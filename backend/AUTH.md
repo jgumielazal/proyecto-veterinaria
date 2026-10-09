@@ -12,11 +12,11 @@ docker compose exec -T postgres psql -U veterinaria -d veterinaria -v ON_ERROR_S
 
 Arrancar backend con `cd backend && npm start` y frontend en otra terminal con `cd frontend && npm run dev`. Abrir http://localhost:5173. No hacen falta secretos ni dependencias nuevas para uso local.
 
-- POST `/auth/registro` y `/auth/login`: JSON `{ "email": "persona@example.com", "password": "contraseña de al menos 8 caracteres" }`. El registro también inicia sesión.
+- POST `/auth/login`: JSON con email y contraseña. Para cuentas pendientes basta el email. El registro público fue retirado.
 - GET `/auth/me`: usuario actual.
 - POST `/auth/logout`: revoca la sesión.
 - Las escrituras requieren el encabezado `X-Requested-With: veterinaria`; el frontend lo envía automáticamente. Desde el frontend las rutas llevan `/api` por el proxy de Vite.
-- Cookies HttpOnly y SameSite=Strict; sesiones en PostgreSQL que vencen a los 7 días. Contraseñas con scrypt y sal aleatoria. Registro y login no tienen límite de intentos ni período de espera.
+- Cookies HttpOnly y SameSite=Strict; sesiones en PostgreSQL que vencen a los 7 días. Contraseñas con scrypt y sal aleatoria. El login no tiene límite de intentos ni período de espera.
 - Todas las operaciones de mascotas requieren sesión. El dueño lo determina el backend, nunca el cuerpo enviado por el cliente.
 - Las mascotas anteriores se conservan sin dueño y no son accesibles por las cuentas nuevas. No se asignan automáticamente.
 
@@ -26,19 +26,10 @@ Esto está configurado para desarrollo local. Para publicarlo se necesita HTTPS,
 
 ## Tipos de usuario
 
-La migración `004_tipos_usuario.sql` agrega `usuarios.tipo`, obligatorio y limitado a
-`cliente` (dueño de la mascota), `veterinario` o `admin`. Las cuentas existentes
-y los registros públicos nuevos quedan como `cliente` (dueño). El registro público
-asigna ese tipo explícitamente en el servidor, ignorando cualquier `tipo`, `rol`
-o `role` enviado en la solicitud. La pantalla informa que la cuenta es para dueños
-y no ofrece selección de roles. El DAO permite indicar
-un tipo al crear cuentas desde código interno; el registro público sigue recibiendo
-solo email y contraseña y no permite elegir el tipo. Para reclasificar una cuenta
-existente se actualiza `usuarios.tipo` directamente en la base de datos.
+La migración `004_tipos_usuario.sql` agrega `usuarios.tipo`, obligatorio y limitado a `cliente` (dueño), `veterinario` o `admin`. El alta de clientes está disponible para administradores y veterinarios y fija el rol `cliente` en el servidor. El formulario y la ruta de registro público se eliminaron. Las cuentas existentes conservan su acceso.
 
-Esta clasificación no modifica permisos: todos los tipos conservan acceso solo
-a sus propias mascotas. Las respuestas de autenticación incluyen `id`, `email` y `tipo`.
-El administrador ve un menú principal con Veterinarios, Dueños y Administración al iniciar sesión. Dentro de Veterinarios están Crear veterinario y Listado de veterinarios; el listado incluye activos e inactivos y permite abrir el perfil de solo lectura, editar sus datos o darlo de baja lógica. El botón Ir al menú principal sigue disponible; las otras dos secciones indican que sus funciones aún no están disponibles.
+Los clientes tienen acceso de solo lectura a sus propias mascotas. Las respuestas de autenticación incluyen `id`, `email` y `tipo`.
+El administrador ve un menú principal con Veterinarios, Dueños y Administración al iniciar sesión. Dentro de Veterinarios están Crear veterinario y Listado de veterinarios; el listado incluye activos e inactivos y permite abrir el perfil de solo lectura, editar sus datos o darlo de baja lógica. El botón Ir al menú principal sigue disponible; Dueños permite añadir y listar dueños, editar sus datos y gestionar sus mascotas y reportes. Administración todavía no tiene funciones disponibles. Los veterinarios usan el mismo menú principal, que muestra únicamente Dueños con esas mismas funciones. El servidor permite a veterinarios solo las rutas `/admin/duenos` y sus subrutas; las demás rutas `/admin` siguen siendo exclusivas del administrador.
 
 
 ## Alta de veterinarios por administradores
@@ -78,14 +69,26 @@ La migración `008_dni_usuarios.sql` agrega `dni` como texto obligatorio, único
 
 Asigna DNI ficticios `11111111`, `22222222`, etc. por posición en `ORDER BY id`, sin usar el valor del ID como número de orden. Si hay más de nueve usuarios, detiene la migración sin cambios para evitar valores inválidos o repetidos; se debe definir otra secuencia para ese caso.
 
-El registro público y el alta/edición de veterinarios requieren `dni` como cadena de ocho dígitos sin puntos ni espacios. Un DNI inválido devuelve 400 y un duplicado devuelve 409. El login sigue usando email y contraseña. Las bajas lógicas conservan su DNI reservado.
+El alta de clientes y el alta/edición de veterinarios requieren `dni` como cadena de ocho dígitos sin puntos ni espacios. Un DNI inválido devuelve 400 y un duplicado devuelve 409. El login sigue usando email y contraseña. Las bajas lógicas conservan su DNI reservado.
 
 Prueba de migración: `node --require tsx/cjs tests/dni.cjs` desde backend; utiliza tablas temporales y revierte todo al terminar.
 
 ## Alta de dueños desde administración
 
-POST `/admin/duenos` requiere sesión de admin y recibe `nombre` (nombre y apellido obligatorios, hasta 150 caracteres), `dni` y `email`. Siempre crea un cliente, no establece cookies ni inicia sesión como el dueño. Guarda el hash de un secreto aleatorio descartado para conservar el esquema existente sin asignar una contraseña conocida. Estos dueños no tienen acceso por contraseña hasta implementar un flujo para definirla. El registro público conserva su contraseña obligatoria.
+POST `/admin/duenos` requiere sesión de admin o veterinario y recibe `nombre` (nombre y apellido obligatorios, hasta 150 caracteres), `dni` y `email`. Siempre crea un cliente, no establece cookies ni inicia sesión como el dueño. Guarda la cuenta en estado pendiente con contraseña nula. El dueño elige su contraseña en el primer ingreso.
 
-GET `/admin/duenos` devuelve únicamente `id`, `nombre`, `dni` y `email` de usuarios de tipo cliente, con acceso exclusivo de administrador. En Dueños → Listado de dueños, la tabla filtra por DNI completo o parcial. Los nombres no registrados y los resultados vacíos se muestran con `-`.
+GET `/admin/duenos` devuelve únicamente `id`, `nombre`, `dni` y `email` de usuarios de tipo cliente, con acceso para administradores y veterinarios. En Dueños → Listado de dueños, la tabla filtra por DNI completo o parcial. Los nombres no registrados y los resultados vacíos se muestran con `-`.
 
-GET `/admin/duenos/:id` muestra los datos del dueño y sus mascotas activas. Es exclusivo de administradores, filtra por el ID del dueño y no cambia la sesión. El botón Detalle del listado abre esta vista de lectura; conserva el acceso al menú principal y permite volver al listado.
+GET `/admin/duenos/:id` muestra los datos del dueño y sus mascotas activas. Está disponible para administradores y veterinarios, filtra por el ID del dueño y no cambia la sesión. El botón Detalle del listado abre esta vista de lectura; conserva el acceso al menú principal y permite volver al listado.
+
+## Activación en el primer ingreso
+
+`011_activacion_usuarios.sql` agrega `estado_activacion` (`pendiente` o `activada`). Una cuenta pendiente requiere `password_hash IS NULL`; una activada requiere un hash no vacío. `activo` representa la baja lógica y es independiente de la activación. Las cuentas existentes conservan sus hashes y quedan activadas.
+
+El alta administrativa de dueños guarda una cuenta pendiente sin contraseña ni sesión. `POST /auth/login` detecta ese estado por email, con o sin contraseña, y devuelve `{ pendiente: true, email }` sin otorgar acceso. `POST /auth/activar` recibe email, password y repetirPassword; valida igualdad y longitud (8 a 128 caracteres), guarda un hash scrypt y activa la cuenta con una actualización condicional. Solo una solicitud concurrente puede activarla. Una cuenta activada o inactiva nunca puede usar este endpoint para reemplazar su contraseña.
+
+Este flujo no verifica identidad mediante email ni código: quien conozca el correo de una cuenta pendiente puede activarla. Es el comportamiento solicitado para esta etapa. El registro público fue eliminado.
+
+Los clientes consultan sus datos, mascotas activas y reportes en `/dueno` y `/dueno/mascotas/:id`. El dueño se determina a partir de la sesión. El backend rechaza sus escrituras en `/mascotas` y su acceso a `/admin`.
+
+Prueba: desde backend, `node --require tsx/cjs tests/primer-acceso.cjs`. Usa cuentas temporales y elimina únicamente sus propios datos.

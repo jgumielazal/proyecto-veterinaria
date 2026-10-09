@@ -24,14 +24,14 @@ export function DatosAnimal({ mascota }: { mascota: DatosMascota }) {
       </dl>
   );
 }
-export default function DetalleMascota({ mascota, onVolver, onActualizar }: { mascota: DatosMascota; onVolver: () => void; onActualizar: () => void }) {
+export default function DetalleMascota({ mascota, onVolver, onActualizar }: { mascota: DatosMascota; onVolver: () => void; onActualizar?: () => void }) {
   const [verTodos, setVerTodos] = useState(false);
   const ultimo = mascota.reportes[0];
   const expandible = mascota.reportes.length > 1 || (ultimo && Array.from(ultimo.texto).length > 100);
   return <div>
-    <button className="secondary admin-back" onClick={onVolver}>Volver al dueño seleccionado</button>
+    <button className="secondary admin-back" onClick={onVolver}>Volver al listado de mascotas</button>
     <section aria-labelledby="datos-mascota">
-      <div className="section-header"><h2 id="datos-mascota">Datos de la mascota</h2><button onClick={onActualizar}>Actualizar</button></div>
+      <div className="section-header"><h2 id="datos-mascota">Datos de la mascota</h2>{onActualizar && <button onClick={onActualizar}>Actualizar</button>}</div>
       <DatosAnimal mascota={mascota} />
     </section>
     <section aria-labelledby="reportes-mascota">

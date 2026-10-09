@@ -7,7 +7,7 @@ configurarAuth(app, { query() { throw new Error('Los datos inválidos no deben c
 const server = app.listen(0, '127.0.0.1', async () => {
   try {
     for (let i=0; i<25; i++) {
-      const r = await fetch(`http://127.0.0.1:${server.address().port}/auth/${i % 2 ? 'login' : 'registro'}`, {
+      const r = await fetch(`http://127.0.0.1:${server.address().port}/auth/login`, {
         method:'POST', headers:{'Content-Type':'application/json','X-Requested-With':'veterinaria'},body:'{}'
       });
       assert.equal(r.status,400,`Intento ${i+1}: debe validar datos sin bloquear`);

@@ -5,13 +5,18 @@ type TipoUsuario = "cliente" | "veterinario" | "admin";
 
 type Usuario = { id: number; email: string; tipo: TipoUsuario };
 type Veterinario = Usuario & { dni: string; nombre: string; matricula: string; especialidad: string; activo: boolean };
-type Credenciales = Usuario & { password_hash: string };
+type Credenciales = Usuario & { password_hash: string | null; estado_activacion: "pendiente" | "activada" };
 
 export = function crearAuthDao(pool: pg.Pool) {
   return {
-    async crearUsuario(email: string, hash: string, dni: string, tipo: TipoUsuario = "cliente", nombre: string | null = null) {
-      const result = await pool.query<Usuario>("INSERT INTO usuarios (email, password_hash, dni, tipo, nombre) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, tipo", [email, hash, dni, tipo, nombre]);
+    async crearUsuario(email: string, hash: string | null, dni: string, tipo: TipoUsuario = "cliente", nombre: string | null = null) {
+      const result = await pool.query<Usuario>("INSERT INTO usuarios (email, password_hash, dni, tipo, nombre, estado_activacion) VALUES ($1, $2, $3, $4, $5, CASE WHEN $2::text IS NULL THEN 'pendiente' ELSE 'activada' END) RETURNING id, email, tipo", [email, hash, dni, tipo, nombre]);
       return result.rows[0]!;
+    },
+    async activarDueno(email: string, hash: string) {
+      return (await pool.query<Usuario>(
+        "UPDATE usuarios SET password_hash=$2, estado_activacion='activada' WHERE email=$1 AND tipo='cliente' AND activo=true AND estado_activacion='pendiente' AND password_hash IS NULL RETURNING id,email,tipo", [email, hash]
+      )).rows[0];
     },
     async crearVeterinario(nombre: string, email: string, hash: string, matricula: string, especialidad: string, dni: string) {
       const result = await pool.query<Usuario>("INSERT INTO usuarios (nombre, email, password_hash, matricula, especialidad, dni, tipo) VALUES ($1, $2, $3, $4, $5, $6, 'veterinario') RETURNING id, email, tipo", [nombre, email, hash, matricula, especialidad, dni]);
@@ -89,7 +94,7 @@ export = function crearAuthDao(pool: pg.Pool) {
       return (await pool.query<Veterinario>("UPDATE usuarios SET activo = false WHERE id = $1 AND tipo = 'veterinario' RETURNING id, nombre, email, dni, tipo, matricula, especialidad, activo", [id])).rows[0];
     },
     async buscarUsuario(email: string) {
-      const result = await pool.query<Credenciales>("SELECT id, email, tipo, password_hash FROM usuarios WHERE email = $1 AND activo = true", [email]);
+      const result = await pool.query<Credenciales>("SELECT id, email, tipo, password_hash, estado_activacion FROM usuarios WHERE email = $1 AND activo = true", [email]);
       return result.rows[0];
     },
     async crearSesion(tokenHash: string, usuarioId: number) {

@@ -20,7 +20,7 @@ export default function AnadirDueno({ onCancelar, dueno, onGuardado }: {
       const usuario = await consultarJson(dueno ? `/api/admin/duenos/${dueno.id}` : '/api/admin/duenos', {
         method: dueno ? 'PUT' : 'POST', body: JSON.stringify({ nombre, dni, email }),
       });
-      if (dueno) { onGuardado?.(usuario); return; }
+      if (onGuardado) { onGuardado(usuario); return; }
       setExito(`Dueño ${usuario.email} añadido.`);
       setNombre(''); setDni(''); setEmail('');
     } catch (error) { setError(error instanceof Error ? error.message : 'No se pudieron guardar los datos del dueño'); }

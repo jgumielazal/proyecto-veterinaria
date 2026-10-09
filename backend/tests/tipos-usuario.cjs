@@ -21,18 +21,20 @@ const db = new Client(process.env.DATABASE_URL
   assert.equal((await db.query('SELECT activo FROM usuarios')).rows[0].activo, true);
   assert.equal((await db.query('SELECT tipo FROM usuarios')).rows[0].tipo, 'cliente');
   await db.query(fs.readFileSync(path.join(__dirname, '../migrations/008_dni_usuarios.sql'), 'utf8'));
+  await db.query(fs.readFileSync(path.join(__dirname, '../migrations/011_activacion_usuarios.sql'), 'utf8'));
   let numeroDni = 80000000;
   const dao = crearDao(db);
   const negocio = crearAuthNegocio(dao);
   const password = 'Prueba-segura-123';
   for (const tipo of ['cliente', 'veterinario', 'admin']) {
     const email = tipo + '@example.test';
-    const registro = await negocio.acceder('registro', { email, password, dni: String(++numeroDni), tipo, rol: tipo, role: tipo });
+    await require('./fixture-usuario.cjs')(db,email,password,String(++numeroDni));
+    const registro = await negocio.acceder({ email, password });
     const usuario = registro.usuario;
     assert.deepEqual(Object.keys(usuario).sort(), ['email', 'id', 'tipo']);
     assert.equal((await db.query('SELECT tipo FROM usuarios WHERE id=$1', [usuario.id])).rows[0].tipo, 'cliente');
     await db.query('UPDATE usuarios SET tipo=$1 WHERE id=$2', [tipo, usuario.id]);
-    assert.deepEqual((await negocio.acceder('login', { email, password })).usuario, { ...usuario, tipo });
+    assert.deepEqual((await negocio.acceder({ email, password })).usuario, { ...usuario, tipo });
     assert.deepEqual(await negocio.autenticar(registro.token), { ...usuario, tipo });
     const interno = await dao.crearUsuario('interno-' + email, 'hash', String(++numeroDni), tipo);
     assert.equal((await db.query('SELECT tipo FROM usuarios WHERE id=$1', [interno.id])).rows[0].tipo, tipo);
@@ -42,7 +44,7 @@ const db = new Client(process.env.DATABASE_URL
     await assert.rejects(db.query('UPDATE usuarios SET tipo=$1', [tipo]), { code: tipo === null ? '23502' : '23514' });
     await db.query('ROLLBACK TO SAVEPOINT invalido');
   }
-  console.log('OK: migración, cuentas existentes, tres tipos, registro público, login, sesión y restricciones.');
+  console.log('OK: migración, cuentas existentes, tres tipos, alta interna, login, sesión y restricciones.');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
   await db.query('ROLLBACK').catch(() => {});
   await db.end();

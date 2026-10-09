@@ -38,60 +38,50 @@ function derivar(password: string, salt: string): Promise<Buffer> {
 }
 
 function crearAuthNegocio(dao: ReturnType<typeof crearAuthDao>) {
-  async function crearDueno(entrada: unknown, nombre: string | null = null) {
-    const { email, password, dni } = (entrada ?? {}) as Record<string, unknown>;
-    validarDni(dni);
-    if (typeof email !== "string" || email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
-        typeof password !== "string" || password.trim().length < 8 || password.length > 128) {
-      throw new ErrorAuth("datos_invalidos", "Ingresá un email válido y una contraseña de entre 8 y 128 caracteres.");
-    }
-    const salt = crypto.randomBytes(16).toString("hex");
-    const hash = `${salt}:${(await derivar(password, salt)).toString("hex")}`;
-    try { return await dao.crearUsuario(email.trim().toLowerCase(), hash, dni, "cliente", nombre); }
-    catch (error) {
-      if ((error as { code?: string }).code === "23505") duplicado(error);
-      throw error;
-    }
-  }
   return {
     async crearDueno(entrada: unknown) {
       const { email, dni, nombre } = (entrada ?? {}) as Record<string, unknown>;
       if (typeof nombre !== "string" || nombre.trim().length > 150 || nombre.trim().split(/\s+/).length < 2) {
         throw new ErrorAuth("datos_invalidos", "Ingresá nombre y apellido (hasta 150 caracteres).");
       }
-      // Alta administrativa sin contraseña elegida ni sesión del dueño.
-      // Se descarta el secreto aleatorio; el acceso requiere definir una contraseña posteriormente.
-      return crearDueno({ email, dni, password: crypto.randomBytes(32).toString("hex") }, nombre.trim());
+      validarDni(dni);
+      if (typeof email !== "string" || email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) throw new ErrorAuth("datos_invalidos", "Ingresá un email válido.");
+      try { return await dao.crearUsuario(email.trim().toLowerCase(), null, dni, "cliente", nombre.trim()); }
+      catch (error) { if ((error as { code?: string }).code === "23505") duplicado(error); throw error; }
     },
-    async acceder(accion: "registro" | "login", entrada: unknown) {
-      const { email, password, dni } = (entrada ?? {}) as { email?: unknown; password?: unknown; dni?: unknown };
+    async activar(entrada: unknown) {
+      const { email, password, repetirPassword } = (entrada ?? {}) as Record<string, unknown>;
       if (typeof email !== "string" || email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
-          typeof password !== "string" || password.trim().length < 8 || password.length > 128) {
-        throw new ErrorAuth("datos_invalidos", "Ingresá un email válido y una contraseña de entre 8 y 128 caracteres.");
+          typeof password !== "string" || password.trim().length < 8 || password.length > 128 || password !== repetirPassword) {
+        throw new ErrorAuth("datos_invalidos", "Ingresá un email válido y dos contraseñas iguales de entre 8 y 128 caracteres.");
       }
-      try {
-        const normalizado = email.trim().toLowerCase();
-        let usuario;
-        if (accion === "registro") {
-          usuario = await crearDueno({ email, password, dni });
-        } else {
-          const row = await dao.buscarUsuario(normalizado);
-          const [salt, esperado] = (row?.password_hash ?? `${"0".repeat(32)}:${"0".repeat(128)}`).split(":");
-          const obtenido = await derivar(password, salt!);
-          if (!crypto.timingSafeEqual(obtenido, Buffer.from(esperado!, "hex")) || !row) {
-            throw new ErrorAuth("credenciales_invalidas", "Email o contraseña incorrectos");
-          }
-          usuario = { id: row.id, email: row.email, tipo: row.tipo };
-        }
-        const valor = crypto.randomBytes(32).toString("hex");
-        await dao.crearSesion(digest(valor), usuario.id);
-        return { usuario, token: valor };
-      } catch (error) {
-        if ((error as { code?: string }).code === "23505") {
-          duplicado(error);
-        }
-        throw error;
+      const salt = crypto.randomBytes(16).toString("hex");
+      const hash = `${salt}:${(await derivar(password, salt)).toString("hex")}`;
+      const usuario = await dao.activarDueno(email.trim().toLowerCase(), hash);
+      if (!usuario) throw new ErrorAuth("credenciales_invalidas", "La cuenta no está pendiente de activación. Iniciá sesión con tu contraseña.");
+      const token = crypto.randomBytes(32).toString("hex");
+      await dao.crearSesion(digest(token), usuario.id);
+      return { usuario, token };
+    },
+    async acceder(entrada: unknown) {
+      const { email, password } = (entrada ?? {}) as Record<string, unknown>;
+      if (typeof email !== "string" || email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        throw new ErrorAuth("datos_invalidos", "Ingresá un email válido.");
       }
+      const row = await dao.buscarUsuario(email.trim().toLowerCase());
+      if (row?.tipo === "cliente" && row.estado_activacion === "pendiente") return { pendiente: true as const, email: row.email };
+      if (typeof password !== "string" || password.trim().length < 8 || password.length > 128) {
+        throw new ErrorAuth("datos_invalidos", "Ingresá una contraseña de entre 8 y 128 caracteres.");
+      }
+      const [salt, esperado] = (row?.password_hash ?? `${"0".repeat(32)}:${"0".repeat(128)}`).split(":");
+      const obtenido = await derivar(password, salt!);
+      if (!crypto.timingSafeEqual(obtenido, Buffer.from(esperado!, "hex")) || !row) {
+        throw new ErrorAuth("credenciales_invalidas", "Email o contraseña incorrectos");
+      }
+      const usuario = { id: row.id, email: row.email, tipo: row.tipo };
+      const token = crypto.randomBytes(32).toString("hex");
+      await dao.crearSesion(digest(token), usuario.id);
+      return { usuario, token };
     },
     async crearVeterinario(entrada: unknown) {
       const { nombre, email, password, matricula, especialidad, dni } = (entrada ?? {}) as Record<string, unknown>;
